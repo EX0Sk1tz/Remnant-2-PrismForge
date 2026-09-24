@@ -1,0 +1,882 @@
+[
+    {
+        "row":  "CriticalDamage",
+        "name":  "Critical Damage",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Critical Damage",
+        "classObject":  "RelicFragment_CriticalDamage_C"
+    },
+    {
+        "row":  "WeakspotDamage",
+        "name":  "Weakspot Damage",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Weakspot Damage",
+        "classObject":  "RelicFragment_WeakspotDamage_C"
+    },
+    {
+        "row":  "RangedDamage",
+        "name":  "Ranged Damage",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Ranged Damage",
+        "classObject":  "RelicFragment_RangedDamage_C"
+    },
+    {
+        "row":  "MeleeDamage",
+        "name":  "Melee Damage",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Melee Damage",
+        "classObject":  "RelicFragment_MeleeDamage_C"
+    },
+    {
+        "row":  "ModDamage",
+        "name":  "Mod Damage",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Mod Damage",
+        "classObject":  "RelicFragment_ModDamage_C"
+    },
+    {
+        "row":  "SkillDamage",
+        "name":  "Skill Damage",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Skill Damage",
+        "classObject":  "RelicFragment_SkillDamage_C"
+    },
+    {
+        "row":  "ExplosiveDamage",
+        "name":  "Explosive Damage",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Explosive Damage",
+        "classObject":  "RelicFragment_ExplosiveDamage_C"
+    },
+    {
+        "row":  "StatusDamage",
+        "name":  "Status Effect Damage",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Status Damage",
+        "classObject":  "RelicFragment_StatusDamage_C"
+    },
+    {
+        "row":  "RangedCriticalChance",
+        "name":  "Ranged Critical Chance",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Ranged Critical Chance",
+        "classObject":  "RelicFragment_RangedCritChance_C"
+    },
+    {
+        "row":  "MeleeCriticalChance",
+        "name":  "Melee Critical Chance",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Melee Critical Chance",
+        "classObject":  "RelicFragment_MeleeCritChance_C"
+    },
+    {
+        "row":  "ModCriticalChance",
+        "name":  "Mod Critical Chance",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Mod Critical Chance",
+        "classObject":  "RelicFragment_ModCritChance_C"
+    },
+    {
+        "row":  "SkillCriticalChance",
+        "name":  "Skill Critical Chance",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Skill Critical Chance",
+        "classObject":  "RelicFragment_SkillCritChance_C"
+    },
+    {
+        "row":  "RangedFireRate",
+        "name":  "Fire Rate",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Ranged Fire Rate",
+        "classObject":  "RelicFragment_RangedFireRate_C"
+    },
+    {
+        "row":  "FirearmChargeSpeed",
+        "name":  "Firearm Charge Time",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Firearm Charge Speed",
+        "classObject":  "RelicFragment_RangedChargeSpeed_C"
+    },
+    {
+        "row":  "MeleeAttackSpeed",
+        "name":  "Total Melee Speed",
+        "kind":  "Standard",
+        "category":  "Red",
+        "description":  "Increases Melee Attack Speed",
+        "classObject":  "RelicFragment_MeleeAttackSpeed_C"
+    },
+    {
+        "row":  "HealthPercent",
+        "name":  "Health Bonus",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Health (Percent)",
+        "classObject":  "RelicFragment_Health_C"
+    },
+    {
+        "row":  "HealthFlat",
+        "name":  "Health",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Health (Flat)",
+        "classObject":  "RelicFragment_HealthFlat_C"
+    },
+    {
+        "row":  "HealthRegen",
+        "name":  "Health Regeneration",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Health Regeneration",
+        "classObject":  "RelicFragment_HealthRegen_C"
+    },
+    {
+        "row":  "HealingEfficacy",
+        "name":  "Healing Effectiveness",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Healing Effectiveness",
+        "classObject":  "RelicFragment_HealingEffectiveness_C"
+    },
+    {
+        "row":  "GreyHealthRate",
+        "name":  "Grey Health Conversion",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Grey Health Conversion",
+        "classObject":  "RelicFragment_GreyHealthRate_C"
+    },
+    {
+        "row":  "StaminaPercent",
+        "name":  "Stamina Bonus",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Stamina (Percent)",
+        "classObject":  "RelicFragment_Stamina_C"
+    },
+    {
+        "row":  "StaminaFlat",
+        "name":  "Stamina",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Stamina (Flat)",
+        "classObject":  "RelicFragment_StaminaFlat_C"
+    },
+    {
+        "row":  "DamageReduction",
+        "name":  "Damage Reduction",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Damage Reduction",
+        "classObject":  "RelicFragment_DamageReduction_C"
+    },
+    {
+        "row":  "ArmorPercent",
+        "name":  "Armor Bonus",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Armor (Percent)",
+        "classObject":  "RelicFragment_ArmorEffectiveness_C"
+    },
+    {
+        "row":  "ArmorFlat",
+        "name":  "Armor",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Armor (Flat)",
+        "classObject":  "RelicFragment_ArmorFlat_C"
+    },
+    {
+        "row":  "ShieldPercent",
+        "name":  "Shield Amount",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Shield Effectiveness",
+        "classObject":  "RelicFragment_ShieldEffectiveness_C"
+    },
+    {
+        "row":  "ShieldDuration",
+        "name":  "Shield Duration",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Shield Effectiveness",
+        "classObject":  "RelicFragment_ShieldDuration_C"
+    },
+    {
+        "row":  "EvadeSpeed",
+        "name":  "Evade Speed",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Evade Speed",
+        "classObject":  "RelicFragment_EvadeSpeed_C"
+    },
+    {
+        "row":  "EvadeDistance",
+        "name":  "Evade Distance",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Evade Speed",
+        "classObject":  "RelicFragment_EvadeDistance_C"
+    },
+    {
+        "row":  "ReviveSpeed",
+        "name":  "Revive Speed",
+        "kind":  "Standard",
+        "category":  "Blue",
+        "description":  "Increases Revive Speed",
+        "classObject":  "RelicFragment_ReviveSpeed_C"
+    },
+    {
+        "row":  "MovementSpeed",
+        "name":  "Movement Speed",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Movement Speed",
+        "classObject":  "RelicFragment_MovementSpeed_C"
+    },
+    {
+        "row":  "WeaponSpread",
+        "name":  "Weapon Spread",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Reduces Weapon Spread",
+        "classObject":  "RelicFragment_WeaponSpread_C"
+    },
+    {
+        "row":  "IdealRange",
+        "name":  "Weapon Ideal Range",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Firearm Range",
+        "classObject":  "RelicFragment_IdealRange_C"
+    },
+    {
+        "row":  "ReloadSpeed",
+        "name":  "Reload Speed",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Reload Speed",
+        "classObject":  "RelicFragment_ReloadSpeed_C"
+    },
+    {
+        "row":  "SwapSpeed",
+        "name":  "Firearm Swap Speed",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Weapon Swap Speed",
+        "classObject":  "RelicFragment_WeaponSwapSpeed_C"
+    },
+    {
+        "row":  "AmmoReserves",
+        "name":  "Ammo Reserves",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Ammo Reserves",
+        "classObject":  "RelicFragment_AmmoReserves_C"
+    },
+    {
+        "row":  "ProjectileSpeed",
+        "name":  "Projectile Speed",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Relic Duration",
+        "classObject":  "RelicFragment_ProjectileSpeed_C"
+    },
+    {
+        "row":  "HeatReduction",
+        "name":  "Heat Reduction",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Reduces Heat Generation",
+        "classObject":  "RelicFragment_HeatGenReduction_C"
+    },
+    {
+        "row":  "CastSpeed",
+        "name":  "Cast Speed",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Casting Speed",
+        "classObject":  "RelicFragment_CastSpeed_C"
+    },
+    {
+        "row":  "ModGeneration",
+        "name":  "Mod Power Generation",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Mod Generation",
+        "classObject":  "RelicFragment_ModGeneration_C"
+    },
+    {
+        "row":  "ModDuration",
+        "name":  "Mod Duration",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Mod Duration",
+        "classObject":  "RelicFragment_ModDuration_C"
+    },
+    {
+        "row":  "SkillCooldown",
+        "name":  "Skill Cooldown",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Reduces Skill Cooldown",
+        "classObject":  "RelicFragment_SkillCooldown_C"
+    },
+    {
+        "row":  "SkillDuration",
+        "name":  "Skill Duration",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Skill Duration",
+        "classObject":  "RelicFragment_SkillDuration_C"
+    },
+    {
+        "row":  "ConsumableSpeed",
+        "name":  "Use Speed",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Relic / Consumable Speed",
+        "classObject":  "RelicFragment_ConsumableSpeed_C"
+    },
+    {
+        "row":  "ConsumableDuration",
+        "name":  "Consumable Duration",
+        "kind":  "Standard",
+        "category":  "Yellow",
+        "description":  "Increases Consumable Duration",
+        "classObject":  "RelicFragment_ConsumableDuration_C"
+    },
+    {
+        "row":  "WeakspotDamageCriticalDamage",
+        "name":  "Meta",
+        "kind":  "Fusion",
+        "category":  "RedRed",
+        "description":  "Weakspot Damage + Critical Damage",
+        "classObject":  "PrismSegment_Meta_C"
+    },
+    {
+        "row":  "ModCriticalSkillCritical",
+        "name":  "Wizard",
+        "kind":  "Fusion",
+        "category":  "RedRed",
+        "description":  "Mod Critical Chance + Skill Critical Chance",
+        "classObject":  "PrismSegment_Wizard_C"
+    },
+    {
+        "row":  "MeleeDamageMeleeSpeed",
+        "name":  "Warrior",
+        "kind":  "Fusion",
+        "category":  "RedRed",
+        "description":  "Melee Damage + Melee Speed",
+        "classObject":  "PrismSegment_Warrior_C"
+    },
+    {
+        "row":  "MeleeCriticalEvadeSpeed",
+        "name":  "Rogue",
+        "kind":  "Fusion",
+        "category":  "RedBlue",
+        "description":  "Melee Critical Chance + Evade Speed",
+        "classObject":  "PrismSegment_Rogue_C"
+    },
+    {
+        "row":  "MeleeSpeedStaminaFlat",
+        "name":  "Pugilist",
+        "kind":  "Fusion",
+        "category":  "RedBlue",
+        "description":  "Melee Speed + Stamina",
+        "classObject":  "PrismSegment_Pugilist_C"
+    },
+    {
+        "row":  "FireRateReloadSpeed",
+        "name":  "Gunfighter",
+        "kind":  "Fusion",
+        "category":  "RedYellow",
+        "description":  "Fire Rate + Reload Speed",
+        "classObject":  "PrismSegment_Gunfighter_C"
+    },
+    {
+        "row":  "RangedDamageIdealRange",
+        "name":  "Sniper",
+        "kind":  "Fusion",
+        "category":  "RedYellow",
+        "description":  "Ranged Damage + Weapon Ideal Range",
+        "classObject":  "PrismSegment_Sniper_C"
+    },
+    {
+        "row":  "RangedCriticalAmmoReserves",
+        "name":  "Munitions",
+        "kind":  "Fusion",
+        "category":  "RedYellow",
+        "description":  "Ranged Critical Chance + Ammo Reserves",
+        "classObject":  "PrismSegment_Munitions_C"
+    },
+    {
+        "row":  "ModDamageModGeneration",
+        "name":  "Mage",
+        "kind":  "Fusion",
+        "category":  "RedYellow",
+        "description":  "Mod Damage + Mod Power Generation",
+        "classObject":  "PrismSegment_Mage_C"
+    },
+    {
+        "row":  "HealthPercentStaminaPercent",
+        "name":  "Hulk",
+        "kind":  "Fusion",
+        "category":  "BlueBlue",
+        "description":  "Health Bonus + Stamina Bonus",
+        "classObject":  "PrismSegment_Hulk_C"
+    },
+    {
+        "row":  "DamageReductionArmorPercent",
+        "name":  "Tank",
+        "kind":  "Fusion",
+        "category":  "BlueBlue",
+        "description":  "Damage Reduction + Armor Bonus",
+        "classObject":  "PrismSegment_Tank_C"
+    },
+    {
+        "row":  "ShieldEfficacyArmorFlat",
+        "name":  "Protected",
+        "kind":  "Fusion",
+        "category":  "BlueBlue",
+        "description":  "Shield Amount + Armor",
+        "classObject":  "PrismSegment_Protected_C"
+    },
+    {
+        "row":  "HealthPercentGreyHealthRate",
+        "name":  "Threshold",
+        "kind":  "Fusion",
+        "category":  "BlueBlue",
+        "description":  "Health Bonus + Grey Health Conversion",
+        "classObject":  "PrismSegment_Threshold_C"
+    },
+    {
+        "row":  "HealthRegenSkillCooldown",
+        "name":  "Revitalize",
+        "kind":  "Fusion",
+        "category":  "BlueYellow",
+        "description":  "Health Regeneration + Skill Cooldown",
+        "classObject":  "PrismSegment_Revitalize_C"
+    },
+    {
+        "row":  "MovementSpeedEvadeSpeed",
+        "name":  "Athletic",
+        "kind":  "Fusion",
+        "category":  "BlueYellow",
+        "description":  "Movement Speed + Evade Speed",
+        "classObject":  "PrismSegment_Athletic_C"
+    },
+    {
+        "row":  "HealingEfficacyUseSpeed",
+        "name":  "Cleric",
+        "kind":  "Fusion",
+        "category":  "BlueYellow",
+        "description":  "Healing Effectiveness + Use Speed",
+        "classObject":  "PrismSegment_Cleric_C"
+    },
+    {
+        "row":  "ModDurationSkillDuration",
+        "name":  "Longevity",
+        "kind":  "Fusion",
+        "category":  "YellowYellow",
+        "description":  "Mod Duration + Skill Duration",
+        "classObject":  "PrismSegment_Longevity_C"
+    },
+    {
+        "row":  "WeaponSpreadSwapSpeed",
+        "name":  "Grip",
+        "kind":  "Fusion",
+        "category":  "YellowYellow",
+        "description":  "Weapon Spread + Firearm Swap Speed",
+        "classObject":  "PrismSegment_Grip_C"
+    },
+    {
+        "row":  "CastSpeedUseSpeed",
+        "name":  "Flash",
+        "kind":  "Fusion",
+        "category":  "YellowYellow",
+        "description":  "Cast Speed + Use Speed",
+        "classObject":  "PrismSegment_Flash_C"
+    },
+    {
+        "row":  "RangedDamageMeleeDamage",
+        "name":  "Pirate",
+        "kind":  "Fusion",
+        "category":  "RedRed",
+        "description":  "Ranged Damage + Melee Damage",
+        "classObject":  "PrismSegment_Pirate_C"
+    },
+    {
+        "row":  "ExplosiveDamageDamageReduction",
+        "name":  "Sapper",
+        "kind":  "Fusion",
+        "category":  "BlueBlue",
+        "description":  "Explosive Damage + Damage Reduction",
+        "classObject":  "PrismSegment_Sapper_C"
+    },
+    {
+        "row":  "FirearmChargeSpeedHeatReduction",
+        "name":  "Capacitor",
+        "kind":  "Fusion",
+        "category":  "RedYellow",
+        "description":  "Firearm Charge Time + Heat Reduction",
+        "classObject":  "PrismSegment_Capacitor_C"
+    },
+    {
+        "row":  "ReviveSpeedHealingEfficacy",
+        "name":  "Selfless",
+        "kind":  "Fusion",
+        "category":  "BlueBlue",
+        "description":  "Revive Speed + Healing Effectiveness",
+        "classObject":  "PrismSegment_Selfless_C"
+    },
+    {
+        "row":  "MasterKiller",
+        "name":  "Master Killer",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Multiplies Weakspot Damage by 1.35x.",
+        "classObject":  "PrismSegment_MasterKiller_C"
+    },
+    {
+        "row":  "Immovable",
+        "name":  "Immovable",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Cannot be Staggered while BULWARK is active.",
+        "classObject":  ""
+    },
+    {
+        "row":  "FullHearted",
+        "name":  "Full Hearted",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Relic Charges by 100%.",
+        "classObject":  "PrismSegment_FullHearted_C"
+    },
+    {
+        "row":  "Allegiance",
+        "name":  "Allegiance",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Cannot Kill or Be Killed by Friendly Fire Damage.",
+        "classObject":  ""
+    },
+    {
+        "row":  "Outlaw",
+        "name":  "Outlaw",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Reloading Reloads both Weapons.",
+        "classObject":  ""
+    },
+    {
+        "row":  "Soulmate",
+        "name":  "Soulmate",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Summon Limit by 1.",
+        "classObject":  "PrismSegment_Soulmate_C"
+    },
+    {
+        "row":  "HeavyDrinker",
+        "name":  "Heavy Drinker",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Concoction Limit by 5.",
+        "classObject":  "PrismSegment_HeavyDrinker_C"
+    },
+    {
+        "row":  "BoundlessEnergy",
+        "name":  "Boundless Energy",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Grants Infinite N\u0027Erudian Energy.",
+        "classObject":  "PrismSegment_BoundlessEnergy_C"
+    },
+    {
+        "row":  "PowerTrip",
+        "name":  "Power Trip",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Doubles Mod Charges.",
+        "classObject":  "PrismSegment_PowerTrip_C"
+    },
+    {
+        "row":  "FleetFooted",
+        "name":  "Fleet Footed",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Dodge Weight Threshold by 100.",
+        "classObject":  "PrismSegment_FleetFooted_C"
+    },
+    {
+        "row":  "LuckOfTheDevil",
+        "name":  "Luck of the Devil",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Grants EXTREME Luck.",
+        "classObject":  "PrismSegment_LuckOfTheDevil_C"
+    },
+    {
+        "row":  "Sadistic",
+        "name":  "Sadistic",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Status Effect Damage has a 50% chance to deal 2x more damage per tick.",
+        "classObject":  ""
+    },
+    {
+        "row":  "Unbridled",
+        "name":  "Unbridled",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Reduces all Skill Cooldowns by Half.",
+        "classObject":  "PrismSegment_Unbridled_C"
+    },
+    {
+        "row":  "DefensiveMeasures",
+        "name":  "Defense Measures",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases SHIELD Maximum by 100%.",
+        "classObject":  "PrismSegment_DefensiveMeasures_C"
+    },
+    {
+        "row":  "GodTear",
+        "name":  "God Tear",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Reduces Cheat Death Cooldowns by 50%.",
+        "classObject":  "PrismSegment_GodTear_C"
+    },
+    {
+        "row":  "SpeedDemon",
+        "name":  "Speed Demon",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Grants Maximum Movement Speed Bonuses.",
+        "classObject":  "PrismSegment_SpeedDemon_C"
+    },
+    {
+        "row":  "Reverberation",
+        "name":  "Reverberation",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Stamina Recovery by 200 per second.",
+        "classObject":  "PrismSegment_Reverberation_C"
+    },
+    {
+        "row":  "Hyperactive",
+        "name":  "Hyperactive",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases HASTE Effectiveness by 100%.",
+        "classObject":  "PrismSegment_Hyperactive_C"
+    },
+    {
+        "row":  "PrimeTime",
+        "name":  "Prime Time",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Enables Prime Perk for Secondary Archetype.",
+        "classObject":  ""
+    },
+    {
+        "row":  "Exhausted",
+        "name":  "Exhausted",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Heat Decay Rate by 250%.",
+        "classObject":  "PrismSegment_Exhausted_C"
+    },
+    {
+        "row":  "Overpowered",
+        "name":  "Overpowered",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Mod Generation by 50%.",
+        "classObject":  "PrismSegment_Overpowered_C"
+    },
+    {
+        "row":  "Gigantic",
+        "name":  "Gigantic",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Grants 50 Health and Stamina.",
+        "classObject":  "PrismSegment_Gigantic_C"
+    },
+    {
+        "row":  "Traitor",
+        "name":  "Traitor",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Maxes out Core Traits.",
+        "classObject":  ""
+    },
+    {
+        "row":  "DarkOmen",
+        "name":  "Dark Omen",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Dodges become Mist Step, costing Health instead of Stamina.",
+        "classObject":  ""
+    },
+    {
+        "row":  "Altruistic",
+        "name":  "Altruistic",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Lifesteal applies 50% of Stolen Health to Allies.",
+        "classObject":  ""
+    },
+    {
+        "row":  "Unbreakable",
+        "name":  "Unbreakable",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Grey Health cannot be removed.",
+        "classObject":  ""
+    },
+    {
+        "row":  "InsultToInjury",
+        "name":  "Insult to Injury",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Applying any Negative Status Effect applies EXPOSED.",
+        "classObject":  ""
+    },
+    {
+        "row":  "Brutality",
+        "name":  "Brutality",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "All Damage Dealt and Received is increased by 100%.",
+        "classObject":  "PrismSegment_Brutality_C"
+    },
+    {
+        "row":  "WreckingBall",
+        "name":  "Wrecking Ball",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Explosive Critical Chance by 100%.",
+        "classObject":  ""
+    },
+    {
+        "row":  "SteelPlating",
+        "name":  "Steel Plating",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Armor by 150.",
+        "classObject":  "PrismSegment_SteelPlating_C"
+    },
+    {
+        "row":  "CriticalSituation",
+        "name":  "Critical Situation",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Grants 35% All Critical Chance within the LIGHT Weight Class.",
+        "classObject":  ""
+    },
+    {
+        "row":  "SharpShooter",
+        "name":  "Sharpshooter",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Ranged Damage by 60%.",
+        "classObject":  "PrismSegment_Sharpshooter_C"
+    },
+    {
+        "row":  "JackOfAllTrades",
+        "name":  "Jack of all Trades",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases All Damage by 40%.",
+        "classObject":  "PrismSegment_JackOfAllTrades_C"
+    },
+    {
+        "row":  "Vaccinated",
+        "name":  "Vaccinated",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Immune to Negative Status Effects.",
+        "classObject":  ""
+    },
+    {
+        "row":  "PeakConditioning",
+        "name":  "Peak Conditioning",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Grants Infinite Stamina.",
+        "classObject":  ""
+    },
+    {
+        "row":  "Physician",
+        "name":  "Physician",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Healing Effectiveness by 100%.",
+        "classObject":  "PrismSegment_Physician_C"
+    },
+    {
+        "row":  "Impervious",
+        "name":  "Impervious",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Reduces All Incoming Damage by 30%.",
+        "classObject":  "PrismSegment_Impervious_C"
+    },
+    {
+        "row":  "Spectrum",
+        "name":  "Spectrum",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Gain Bonuses Based on Color of Fragments within the Prism.",
+        "classObject":  "PrismSegment_Spectrum_C"
+    },
+    {
+        "row":  "ArtfulDodger",
+        "name":  "Artful Dodger",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "All Dodges trigger Perfect Dodge Mechanics. Cooldown of 3 seconds.",
+        "classObject":  ""
+    },
+    {
+        "row":  "PowerFantasy",
+        "name":  "Power Fantasy",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Increases Explosive Critical Chance and Critical Damage by 30%.",
+        "classObject":  ""
+    },
+    {
+        "row":  "SizeMatters",
+        "name":  "Size Matters",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Doubles Magazine Size for non Single Shot Weapons.",
+        "classObject":  "PrismSegment_SizeMatters_C"
+    },
+    {
+        "row":  "Bodyguard",
+        "name":  "Bodyguard",
+        "kind":  "Legendary",
+        "category":  "Legendary",
+        "description":  "Cannot be One-Shot while at Max Health Capacity.",
+        "classObject":  ""
+    }
+]

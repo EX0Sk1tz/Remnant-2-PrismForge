@@ -1,0 +1,989 @@
+<Window x:Class="R2PrismRuntime.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="clr-namespace:R2PrismRuntime.UI"
+        xmlns:m="clr-namespace:R2PrismRuntime.Models"
+        xmlns:g="clr-namespace:R2PrismRuntime.Game"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance ui:MainViewModel}"
+        Title="Prismforge · Remnant II"
+        Icon="/Assets/app.ico"
+        Width="1320" Height="860" MinWidth="1080" MinHeight="660"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource SootBrush}"
+        FontFamily="{StaticResource UiFont}"
+        Foreground="{StaticResource TextBrush}"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <!-- Decorative crystal outline, used behind the prism header and in empty states -->
+        <Geometry x:Key="Crystal">M60,0 L120,42 L120,118 L60,160 L0,118 L0,42 Z M60,0 L60,160 M0,42 L60,72 L120,42 M0,118 L60,72 L120,118</Geometry>
+
+        <!-- Section header: tracked label, rule, optional right-hand content -->
+        <Style x:Key="SectionLabel" TargetType="TextBlock" BasedOn="{StaticResource Eyebrow}">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ─── Level stepper used by segments and fed fragments ─── -->
+        <DataTemplate x:Key="Stepper" DataType="{x:Type m:SlotBase}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Style="{StaticResource StepButton}" Content="−" ToolTip="Lower level"
+                        Command="{Binding DataContext.StepDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}"/>
+                <TextBox x:Name="box" Style="{StaticResource LevelField}"
+                         Text="{Binding EditLevel, UpdateSourceTrigger=PropertyChanged}"/>
+                <Button Style="{StaticResource StepButton}" Content="+" ToolTip="Raise level"
+                        Command="{Binding DataContext.StepUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}"/>
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsLevelDirty}" Value="True">
+                    <Setter TargetName="box" Property="Foreground" Value="{StaticResource PendingBrush}"/>
+                    <Setter TargetName="box" Property="BorderBrush" Value="{StaticResource PendingBrush}"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Attribute explanation tooltip (DataContext = StatEntry) -->
+        <ToolTip x:Key="StatTip" x:Shared="False">
+            <StackPanel MaxWidth="320">
+                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock Text="{Binding Info}" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{StaticResource TextDimBrush}"/>
+                <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{StaticResource WarnBrush}"
+                           Visibility="{Binding Warning, Converter={StaticResource NullVis}}"/>
+                <TextBlock Text="{Binding Name}" FontFamily="{StaticResource MonoFont}" FontSize="10.5" Margin="0,6,0,0"
+                           Foreground="{StaticResource TextFaintBrush}"/>
+            </StackPanel>
+        </ToolTip>
+
+        <!-- Small "pending" diamond -->
+        <Style x:Key="PendingMark" TargetType="Path">
+            <Setter Property="Data" Value="M4,0 L8,4 L4,8 L0,4 Z"/>
+            <Setter Property="Fill" Value="{StaticResource PendingBrush}"/>
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ─── Prism list item ─── -->
+        <Style x:Key="PrismItem" TargetType="ListBoxItem">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Grid x:Name="root" Background="Transparent">
+                            <Border x:Name="bg" Background="Transparent" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"/>
+                            <Rectangle x:Name="bar" Width="2" HorizontalAlignment="Left" Fill="{StaticResource EmberBrush}" Visibility="Hidden"/>
+                            <ContentPresenter Margin="18,14,16,14"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{StaticResource AshBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bg" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#3E1B1E" Offset="0"/>
+                                            <GradientStop Color="#25282A" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="bar" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="Root">
+        <!-- Background: grain + vignette -->
+        <Rectangle Fill="{DynamicResource Grain}" IsHitTestVisible="False"/>
+        <Rectangle Fill="{StaticResource SkyGlow}" IsHitTestVisible="False"/>
+        <Rectangle Fill="{StaticResource FireGlow}" IsHitTestVisible="False"/>
+        <Rectangle Fill="{StaticResource Vignette}" IsHitTestVisible="False"/>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="32"/>
+            </Grid.RowDefinitions>
+
+            <!-- ═══════════ Title bar ═══════════ -->
+            <Border Grid.Row="0" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Background="#C8141516">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
+                        <Path Data="M5,0 L10,5 L5,10 L0,5 Z" Fill="{StaticResource EmberBrush}" Width="10" Height="10" VerticalAlignment="Center"/>
+                        <TextBlock Text="{ui:Caps 'Remnant II', Wide=True}" Style="{StaticResource Eyebrow}" Margin="12,0,0,0"
+                                   VerticalAlignment="Center"/>
+                        <Rectangle Width="1" Height="14" Fill="{StaticResource HairlineBrush}" Margin="14,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{ui:Caps 'Prismforge', Wide=True}" FontSize="12.5" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{ui:Caps 'Live'}" Style="{StaticResource Eyebrow}" Foreground="{StaticResource EmberBrush}"
+                                   Margin="10,1,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Page tabs -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Style="{StaticResource NavTab}" Command="{Binding ShowPrismsCommand}"
+                                Tag="{Binding Page, Converter={StaticResource Equals}, ConverterParameter=Prisms}">
+                            <TextBlock Text="{ui:Caps Prisms, Wide=True}"/>
+                        </Button>
+                        <Button Style="{StaticResource NavTab}" Command="{Binding ShowStatsCommand}"
+                                Tag="{Binding Page, Converter={StaticResource Equals}, ConverterParameter=Stats}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{ui:Caps Attributes, Wide=True}"/>
+                                <TextBlock Text="{Binding HeldStats.Count}" Foreground="{StaticResource EmberBrush}" Margin="8,0,0,0"
+                                           Visibility="{Binding HeldStats.Count, Converter={StaticResource CountVis}}"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <!-- Link indicator -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,18,0"
+                                    ToolTip="{Binding Status}">
+                            <Path Data="M4,0 L8,4 L4,8 L0,4 Z" Width="8" Height="8" VerticalAlignment="Center"
+                                  Fill="{Binding Link, Converter={StaticResource ToneBrush}}"/>
+                            <TextBlock Text="{Binding LinkText, Converter={StaticResource Tracked}}" Style="{StaticResource Eyebrow}"
+                                       Foreground="{StaticResource TextDimBrush}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding LinkDetail}" FontFamily="{StaticResource MonoFont}" FontSize="10.5"
+                                       Foreground="{StaticResource TextFaintBrush}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Rectangle Width="1" Height="16" Fill="{StaticResource HairlineBrush}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ChromeButton}" Click="OnMinimize" ToolTip="Minimize">
+                            <Rectangle Width="10" Height="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Button>
+                        <Button Style="{StaticResource ChromeButton}" Click="OnMaximize" ToolTip="Maximize">
+                            <Rectangle Width="10" Height="10" StrokeThickness="1"
+                                       Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Button>
+                        <Button Style="{StaticResource CloseButton}" Click="OnClose" ToolTip="Close">
+                            <Path Data="M0,0 L10,10 M10,0 L0,10" StrokeThickness="1.1"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ═══════════ Main: prisms ═══════════ -->
+            <Grid Grid.Row="1" Visibility="{Binding Page, Converter={StaticResource Equals}, ConverterParameter=Prisms}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="310"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ─── Left: prism list ─── -->
+                <Border Grid.Column="0" Background="#B01B1C1E" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,1,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Margin="18,20,10,12">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{ui:Caps Prisms, Wide=True}" Style="{StaticResource SectionLabel}"/>
+                                <TextBlock Text="{Binding Prisms.Count}" Style="{StaticResource SectionLabel}"
+                                           Foreground="{StaticResource TextFaintBrush}" Margin="10,0,0,0"/>
+                            </StackPanel>
+                            <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right" Command="{Binding RescanCommand}"
+                                    ToolTip="Read the inventory again">
+                                <TextBlock Text="{ui:Caps Rescan}"/>
+                            </Button>
+                        </Grid>
+
+                        <ListBox Grid.Row="1" ItemsSource="{Binding Prisms}" SelectedItem="{Binding SelectedPrism}"
+                                 Background="Transparent" BorderThickness="0" Padding="0"
+                                 ItemContainerStyle="{StaticResource PrismItem}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 BorderBrush="{StaticResource HairlineBrush}">
+                            <ListBox.Template>
+                                <ControlTemplate TargetType="ListBox">
+                                    <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0">
+                                        <ScrollViewer Focusable="False">
+                                            <ItemsPresenter/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </ControlTemplate>
+                            </ListBox.Template>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type m:PrismData}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="42"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Numeral}" FontSize="20" FontWeight="Light"
+                                                   Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Name}" FontSize="15" Foreground="{StaticResource TextBrush}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                                <TextBlock Style="{StaticResource Eyebrow}" VerticalAlignment="Center">
+                                                    <Run Text="{ui:Caps Lv}"/>
+                                                    <Run Text="{Binding Level, Mode=OneWay}" Foreground="{StaticResource TextDimBrush}"/>
+                                                </TextBlock>
+                                                <ItemsControl ItemsSource="{Binding Segments}" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <ui:Gem Def="{Binding EditDef}" Width="9" Height="11" Margin="0,0,4,0"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Path Grid.Column="2" Style="{StaticResource PendingMark}" Margin="8,0,0,0"
+                                              ToolTip="Pending changes"
+                                              Visibility="{Binding IsDirty, Converter={StaticResource BoolVis}}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <!-- Empty list -->
+                        <StackPanel Grid.Row="1" Margin="22,28,22,0"
+                                    Visibility="{Binding Prisms.Count, Converter={StaticResource CountVisInv}}">
+                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" FontSize="13.5" Foreground="{StaticResource TextDimBrush}"
+                                       LineHeight="20"/>
+                            <Rectangle Height="1" Fill="{StaticResource HairlineBrush}" Margin="0,18"/>
+                            <TextBlock Style="{StaticResource Eyebrow}" Text="{ui:Caps 'How it works'}" Margin="0,0,0,10"/>
+                            <TextBlock Style="{StaticResource Body}" FontSize="12.5" Foreground="{StaticResource TextFaintBrush}"
+                                       TextWrapping="Wrap" LineHeight="20">
+                                <Run Text="1" Foreground="{StaticResource EmberBrush}"/><Run Text="   Start Remnant 2."/>
+                                <LineBreak/>
+                                <Run Text="2" Foreground="{StaticResource EmberBrush}"/><Run Text="   Load a character into the world."/>
+                                <LineBreak/>
+                                <Run Text="3" Foreground="{StaticResource EmberBrush}"/><Run Text="   Your prisms show up here on their own."/>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <!-- Footer -->
+                        <Border Grid.Row="2" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource Eyebrow}" FontWeight="Normal">
+                                    <Run Text="{ui:Caps 'Stats known to game'}"/>
+                                    <Run Text="  "/>
+                                    <Run Text="{Binding ResolvedStats, Mode=OneWay}" Foreground="{StaticResource TextDimBrush}"/>
+                                    <Run Text="/"/>
+                                    <Run Text="{Binding TotalStats, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock Style="{StaticResource Eyebrow}" FontWeight="Normal" Margin="0,6,0,0" TextWrapping="Wrap"
+                                           Text="Back up your save before editing. Changes are saved by the game at its next autosave."/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- ─── Right: prism detail ─── -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Nothing selected -->
+                    <Grid Visibility="{Binding SelectedPrism, Converter={StaticResource NullVisInv}}">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path Data="{StaticResource Crystal}" Stroke="{StaticResource BronzeBrush}" StrokeThickness="1"
+                                  Width="90" Height="120" Stretch="Uniform" Opacity="0.6" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{ui:Caps 'No prism selected', Wide=True}" Style="{StaticResource Eyebrow}"
+                                       HorizontalAlignment="Center" Margin="0,24,0,0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <ScrollViewer DataContext="{Binding SelectedPrism}" VerticalScrollBarVisibility="Auto"
+                                  Visibility="{Binding Converter={StaticResource NullVis}}">
+                        <StackPanel Margin="44,34,44,36" MaxWidth="1100">
+
+                            <!-- Header -->
+                            <Grid>
+                                <Path Data="{StaticResource Crystal}" Stroke="{StaticResource TextBrush}" StrokeThickness="1"
+                                      Width="120" Height="160" Stretch="Uniform" Opacity="0.07"
+                                      HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-14,20,0"/>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource Eyebrow}" Foreground="{StaticResource EmberBrush}">
+                                        <Run Text="{ui:Caps Prism, Wide=True}"/>
+                                        <Run Text=" "/>
+                                        <Run Text="{Binding Numeral, Mode=OneWay}"/>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Name}" FontSize="36" FontWeight="Light" Margin="0,6,0,0"
+                                               Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis"/>
+
+                                    <!-- Stat strip -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
+                                        <StackPanel MinWidth="96">
+                                            <TextBlock Text="{ui:Caps Level}" Style="{StaticResource Eyebrow}"/>
+                                            <TextBlock Text="{Binding Level}" FontSize="28" FontWeight="Light" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <Rectangle Width="1" Fill="{StaticResource HairlineBrush}" Margin="24,2"/>
+                                        <StackPanel>
+                                            <TextBlock Text="{ui:Caps 'Pending XP'}" Style="{StaticResource Eyebrow}"
+                                                       ToolTip="Experience the prism has banked. Stored at prism data +0x84."/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                <TextBox x:Name="XpBox" Style="{StaticResource Field}" Width="150" Height="32" FontSize="16"
+                                                         Text="{Binding EditXp, Converter={StaticResource Xp}, UpdateSourceTrigger=LostFocus}"
+                                                         KeyDown="OnFieldKeyDown"/>
+                                                <Path Style="{StaticResource PendingMark}" Margin="10,0,0,0"
+                                                      Visibility="{Binding IsXpDirty, Converter={StaticResource BoolVis}}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Rectangle Width="1" Fill="{StaticResource HairlineBrush}" Margin="24,2"/>
+                                        <StackPanel MinWidth="80">
+                                            <TextBlock Text="{ui:Caps Segments}" Style="{StaticResource Eyebrow}"/>
+                                            <TextBlock Text="{Binding Segments.Count}" FontSize="28" FontWeight="Light" Margin="0,4,0,0"
+                                                       Foreground="{StaticResource TextDimBrush}"/>
+                                        </StackPanel>
+                                        <Rectangle Width="1" Fill="{StaticResource HairlineBrush}" Margin="24,2"/>
+                                        <StackPanel MinWidth="80">
+                                            <TextBlock Text="{ui:Caps 'Fed fragments'}" Style="{StaticResource Eyebrow}"/>
+                                            <TextBlock Text="{Binding Feeds.Count}" FontSize="28" FontWeight="Light" Margin="0,4,0,0"
+                                                       Foreground="{StaticResource TextDimBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- ─── Segments ─── -->
+                            <Grid Margin="0,40,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{ui:Caps Segments, Wide=True}" Style="{StaticResource SectionLabel}"/>
+                                <Rectangle Grid.Column="1" Height="1" Fill="{StaticResource HairlineBrush}" Margin="16,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                            DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                                    <TextBlock Text="{ui:Caps 'Set all to'}" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox Style="{StaticResource LevelField}" BorderThickness="1" Text="{Binding SegmentTarget, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <Button Style="{StaticResource BaseButton}" Padding="12,0" Height="26" Margin="6,0,0,0"
+                                            Command="{Binding SetAllSegmentsCommand}"
+                                            ToolTip="Stage this level on every non-legendary segment">
+                                        <TextBlock Text="{ui:Caps Stage}" FontSize="10.5"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <ItemsControl ItemsSource="{Binding Segments}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type m:SegmentSlot}">
+                                        <Border x:Name="row" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
+                                                Background="Transparent" MinHeight="72">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="3"/>
+                                                    <ColumnDefinition Width="44"/>
+                                                    <ColumnDefinition Width="52"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <Rectangle x:Name="dirtyBar" Fill="{StaticResource PendingBrush}" Visibility="Hidden" Margin="0,10"/>
+
+                                                <TextBlock Grid.Column="1" Text="{Binding Number, StringFormat={}{0:00}}"
+                                                           Style="{StaticResource Eyebrow}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                           x:Name="idx"/>
+
+                                                <ui:Gem Grid.Column="2" Def="{Binding EditDef}" Width="24" Height="30"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Center"/>
+
+                                                <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="0,10,16,10">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding EditDef.Name}" FontSize="17" Foreground="{StaticResource TextBrush}"/>
+                                                        <TextBlock x:Name="kind" Text="{Binding EditDef.Group, Converter={StaticResource Tracked}}"
+                                                                   Style="{StaticResource Eyebrow}" Margin="12,2,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding EditDef.Description}" FontSize="12" Foreground="{StaticResource TextFaintBrush}"
+                                                               TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                                    <TextBlock x:Name="was" FontSize="11.5" Foreground="{StaticResource PendingBrush}" Margin="0,4,0,0"
+                                                               Visibility="Collapsed">
+                                                        <Run Text="Currently"/>
+                                                        <Run Text="{Binding Def.Name, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                    <TextBlock x:Name="legendNote" FontSize="11.5" Foreground="{StaticResource TextFaintBrush}"
+                                                               Margin="0,4,0,0" Visibility="Collapsed" TextWrapping="Wrap"
+                                                               Text="Legendary effects are rebuilt from the saved row. Save and reload your character after applying."/>
+                                                </StackPanel>
+
+                                                <ComboBox x:Name="picker" Grid.Column="4" Style="{StaticResource StatPicker}"
+                                                          VerticalAlignment="Center" Margin="0,0,20,0"
+                                                          SelectedItem="{Binding EditDef}"
+                                                          ItemsSource="{Binding DataContext.SegmentChoices, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                    <ComboBox.GroupStyle>
+                                                        <StaticResource ResourceKey="PickerGroup"/>
+                                                    </ComboBox.GroupStyle>
+                                                </ComboBox>
+
+                                                <ui:LevelPips Grid.Column="5" Value="{Binding EditLevel}" Live="{Binding Level}" Max="10"
+                                                              Width="80" Height="12" VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+                                                <ContentPresenter Grid.Column="6" Content="{Binding}" ContentTemplate="{StaticResource Stepper}"
+                                                                  VerticalAlignment="Center"/>
+
+                                                <Button x:Name="reset" Grid.Column="7" Style="{StaticResource LinkButton}" Margin="8,0,0,0"
+                                                        Visibility="Hidden" ToolTip="Undo the pending change on this segment"
+                                                        Command="{Binding DataContext.ResetSlotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}">
+                                                    <Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{StaticResource TextDimBrush}" StrokeThickness="1.2"/>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <Trigger SourceName="row" Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="row" Property="Background" Value="#66303437"/>
+                                            </Trigger>
+                                            <DataTrigger Binding="{Binding IsDirty}" Value="True">
+                                                <Setter TargetName="dirtyBar" Property="Visibility" Value="Visible"/>
+                                                <Setter TargetName="reset" Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsRowDirty}" Value="True">
+                                                <Setter TargetName="was" Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Def.Kind}" Value="{x:Static g:SegmentKind.Legendary}">
+                                                <Setter TargetName="picker" Property="ItemsSource"
+                                                        Value="{Binding DataContext.LegendaryChoices, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                <Setter TargetName="kind" Property="Foreground" Value="#E6CF8F"/>
+                                            </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Def.Kind}" Value="{x:Static g:SegmentKind.Legendary}"/>
+                                                    <Condition Binding="{Binding IsRowDirty}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter TargetName="legendNote" Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Padding="12,22"
+                                    Visibility="{Binding Segments.Count, Converter={StaticResource CountVisInv}}">
+                                <TextBlock FontSize="13" Foreground="{StaticResource TextFaintBrush}" TextWrapping="Wrap"
+                                           Text="This prism has no segments yet. Segments appear as the prism levels up in game; the editor can only change segments that exist."/>
+                            </Border>
+
+                            <!-- ─── Fed fragments ─── -->
+                            <StackPanel Visibility="{Binding Feeds.Count, Converter={StaticResource CountVis}}">
+                                <Grid Margin="0,44,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{ui:Caps 'Fed fragments', Wide=True}" Style="{StaticResource SectionLabel}"/>
+                                    <Rectangle Grid.Column="1" Height="1" Fill="{StaticResource HairlineBrush}" Margin="16,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                                DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                                        <TextBlock Text="{ui:Caps 'Raise all to'}" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <TextBox Style="{StaticResource LevelField}" BorderThickness="1" Text="{Binding FeedTarget, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <Button Style="{StaticResource BaseButton}" Padding="12,0" Height="26" Margin="6,0,0,0"
+                                                Command="{Binding SetAllFeedsCommand}"
+                                                ToolTip="Stage at least this level on every fed fragment">
+                                            <TextBlock Text="{ui:Caps Stage}" FontSize="10.5"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock FontSize="12" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,14" TextWrapping="Wrap"
+                                           Text="Relic fragments fed into this prism. A higher level makes that stat more likely to be offered when the prism levels up."/>
+
+                                <ItemsControl ItemsSource="{Binding Feeds}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type m:FeedSlot}">
+                                            <Border x:Name="card" Width="340" Height="56" Margin="0,0,10,10" Background="#A0212325"
+                                                    BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="3"/>
+                                                        <ColumnDefinition Width="36"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Rectangle x:Name="dirtyBar" Fill="{StaticResource PendingBrush}" Visibility="Hidden"/>
+                                                    <ui:Gem Grid.Column="1" Def="{Binding EditDef}" Width="14" Height="18" HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding EditDef.Name}" FontSize="13.5" VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding EditDef.Description}"/>
+                                                    <ComboBox x:Name="picker" Grid.Column="3" Style="{StaticResource StatPicker}" Margin="8,0"
+                                                              VerticalAlignment="Center" SelectedItem="{Binding EditDef}"
+                                                              ItemsSource="{Binding DataContext.FragmentChoices, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                        <ComboBox.GroupStyle>
+                                                            <StaticResource ResourceKey="PickerGroup"/>
+                                                        </ComboBox.GroupStyle>
+                                                    </ComboBox>
+                                                    <ContentPresenter Grid.Column="4" Content="{Binding}" ContentTemplate="{StaticResource Stepper}"
+                                                                      Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsDirty}" Value="True">
+                                                    <Setter TargetName="dirtyBar" Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <Trigger SourceName="card" Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="card" Property="BorderBrush" Value="{StaticResource BronzeBrush}"/>
+                                                </Trigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- ─── Action bar ─── -->
+                    <Border Grid.Row="1" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0"
+                            Background="#E0181A1B" Padding="44,14">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding HasChanges, Converter={StaticResource BoolVis}}">
+                                    <Path Style="{StaticResource PendingMark}"/>
+                                    <TextBlock Style="{StaticResource Eyebrow}" Foreground="{StaticResource PendingBrush}" Margin="10,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding PendingText, Converter={StaticResource Tracked}}"/>
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource Eyebrow}" VerticalAlignment="Center"
+                                           Text="{ui:Caps 'In step with the game'}"
+                                           Visibility="{Binding HasChanges, Converter={StaticResource BoolVisInv}}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource LinkButton}" Command="{Binding RevertCommand}" Margin="0,0,14,0"
+                                        ToolTip="Stage the values this prism had when the editor first saw it">
+                                    <TextBlock Text="{ui:Caps 'Revert to session start'}"/>
+                                </Button>
+                                <Button Style="{StaticResource BaseButton}" Command="{Binding DiscardCommand}" Margin="0,0,10,0" MinWidth="110">
+                                    <TextBlock Text="{ui:Caps Discard}"/>
+                                </Button>
+                                <Button Style="{StaticResource PrimaryButton}" Command="{Binding ApplyCommand}" MinWidth="170">
+                                    <TextBlock Text="{ui:Caps 'Apply to game', Wide=True}"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- ═══════════ Main: attributes ═══════════ -->
+            <Grid Grid.Row="1" Visibility="{Binding Page, Converter={StaticResource Equals}, ConverterParameter=Stats}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="310"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ─── Left: hook and held values ─── -->
+                <Border Background="#B01B1C1E" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,1,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Margin="18,20,18,18">
+                            <TextBlock Text="{ui:Caps 'Stat hook', Wide=True}" Style="{StaticResource SectionLabel}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                <Path Data="M5,0 L10,5 L5,10 L0,5 Z" Width="10" Height="10" VerticalAlignment="Center"
+                                      Fill="{Binding HookState, Converter={StaticResource ToneBrush}}"/>
+                                <TextBlock Text="{Binding HookState, Converter={StaticResource Tracked}}" FontSize="13" FontWeight="SemiBold"
+                                           Margin="10,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding HookDetail}" FontSize="12" Foreground="{StaticResource TextDimBrush}"
+                                       TextWrapping="Wrap" Margin="0,6,0,0"/>
+                            <TextBlock FontSize="12" Foreground="{StaticResource TextFaintBrush}" Margin="0,4,0,0"
+                                       Visibility="{Binding IsHookOn, Converter={StaticResource BoolVis}}"
+                                       ToolTip="How often the game has stored a stat through the hook">
+                                <Run Text="Stat writes seen:"/>
+                                <Run Text="{Binding HookHits, Mode=OneWay}" Foreground="{StaticResource TextDimBrush}"/>
+                            </TextBlock>
+                            <TextBlock FontSize="12" Foreground="{StaticResource TextFaintBrush}" TextWrapping="Wrap" Margin="0,12,0,0"
+                                       LineHeight="18"
+                                       Text="Holding a stat patches the code where the game stores computed stats (the CT's System Statistics hook), so the value survives recalculation. Extreme values can crash the game."/>
+                        </StackPanel>
+
+                        <Grid Grid.Row="1" Margin="18,10,18,10">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{ui:Caps Held, Wide=True}" Style="{StaticResource SectionLabel}"/>
+                                <TextBlock Text="{Binding HeldStats.Count}" Style="{StaticResource SectionLabel}"
+                                           Foreground="{StaticResource TextFaintBrush}" Margin="10,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding HeldStats}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type m:StatEntry}">
+                                            <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="18,10,10,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Background="Transparent"
+                                                                ToolTip="{StaticResource StatTip}" ToolTipService.InitialShowDelay="250">
+                                                        <Path Data="M4,0 L8,4 L4,8 L0,4 Z" Width="7" Height="7" Fill="{StaticResource WarnBrush}"
+                                                              VerticalAlignment="Center" Margin="0,0,7,0"
+                                                              Visibility="{Binding Warning, Converter={StaticResource NullVis}}"/>
+                                                        <TextBlock Text="{Binding DisplayName}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Target, StringFormat={}{0:0.###}}" FontSize="13"
+                                                               Foreground="{StaticResource EmberHiBrush}" Margin="10,0" VerticalAlignment="Center"/>
+                                                    <Button Grid.Column="2" Style="{StaticResource LinkButton}" ToolTip="Release"
+                                                            Command="{Binding DataContext.ToggleHoldCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{StaticResource TextDimBrush}" StrokeThickness="1.2"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Margin="18,4,18,0" FontSize="12" Foreground="{StaticResource TextFaintBrush}" TextWrapping="Wrap"
+                                           Visibility="{Binding HeldStats.Count, Converter={StaticResource CountVisInv}}"
+                                           Text="Nothing held. Type a value next to a stat and press Hold."/>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <Border Grid.Row="3" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
+                            <Button Style="{StaticResource BaseButton}" Command="{Binding ReleaseAllCommand}" HorizontalAlignment="Stretch"
+                                    IsEnabled="{Binding IsHookOn}" ToolTip="Release every stat and restore the original game code">
+                                <TextBlock Text="{ui:Caps 'Release all'}"/>
+                            </Button>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- ─── Right: stat list ─── -->
+                <Grid Grid.Column="1" Margin="44,34,44,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock Text="{ui:Caps Character, Wide=True}" Style="{StaticResource Eyebrow}" Foreground="{StaticResource EmberBrush}"/>
+                            <TextBlock Text="Attributes" FontSize="36" FontWeight="Light" Margin="0,6,0,0"/>
+                        </StackPanel>
+                        <Grid HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="260">
+                            <TextBox x:Name="StatSearchBox" Style="{StaticResource Field}" Height="32"
+                                     Text="{Binding StatSearch, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="Search stats" FontSize="13" Foreground="{StaticResource TextFaintBrush}" Margin="9,0,0,0"
+                                       VerticalAlignment="Center" IsHitTestVisible="False"
+                                       Visibility="{Binding StatSearch, Converter={StaticResource Equals}, ConverterParameter=''}"/>
+                        </Grid>
+                    </Grid>
+
+                    <ItemsControl Grid.Row="1" ItemsSource="{Binding StatFilters}" Margin="0,22,0,14">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource Chip}" CommandParameter="{Binding}"
+                                        Command="{Binding DataContext.SetStatFilterCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                                    <Button.Tag>
+                                        <MultiBinding Converter="{StaticResource AllEqual}">
+                                            <Binding/>
+                                            <Binding Path="DataContext.StatFilter" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                        </MultiBinding>
+                                    </Button.Tag>
+                                    <TextBlock Text="{Binding Converter={StaticResource Tracked}}"/>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Column headers -->
+                    <Grid Grid.Row="2" Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="110"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{ui:Caps Stat}" Style="{StaticResource Eyebrow}" Margin="17,0,0,0"/>
+                        <TextBlock Grid.Column="1" Text="{ui:Caps Current}" Style="{StaticResource Eyebrow}" HorizontalAlignment="Right" Margin="0,0,20,0"/>
+                        <TextBlock Grid.Column="2" Text="{ui:Caps 'Hold at'}" Style="{StaticResource Eyebrow}"/>
+                    </Grid>
+
+                    <ListBox Grid.Row="3" ItemsSource="{Binding StatsView}" Background="Transparent" BorderThickness="0"
+                             Foreground="{StaticResource TextBrush}"
+                             VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                        <ListBox.Template>
+                            <ControlTemplate TargetType="ListBox">
+                                <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0">
+                                    <ScrollViewer Focusable="False" CanContentScroll="True">
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </ControlTemplate>
+                        </ListBox.Template>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Focusable" Value="False"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter/>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type m:StatEntry}">
+                                <Border x:Name="row" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
+                                        Background="Transparent" Height="50">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="3"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="120"/>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="110"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Rectangle x:Name="bar" Fill="{StaticResource EmberBrush}" Visibility="Hidden" Margin="0,8"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,10,0"
+                                                    Background="Transparent" ToolTip="{StaticResource StatTip}"
+                                                    ToolTipService.InitialShowDelay="250">
+                                            <TextBlock Text="{Binding DisplayName}" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock x:Name="meta" FontSize="10.5" Foreground="{StaticResource TextFaintBrush}" Margin="0,2,0,0">
+                                                <Run Text="{Binding Category, Mode=OneWay, Converter={StaticResource Tracked}}"/>
+                                                <Run Text="   "/>
+                                                <Run Text="{Binding Name, Mode=OneWay}" FontFamily="{StaticResource MonoFont}"/>
+                                            </TextBlock>
+                                            <StackPanel x:Name="warn" Orientation="Horizontal" Margin="0,2,0,0"
+                                                        Visibility="{Binding Warning, Converter={StaticResource NullVis}}">
+                                                <Path Data="M4,0 L8,4 L4,8 L0,4 Z" Width="7" Height="7" Fill="{StaticResource WarnBrush}"
+                                                      VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Warning}" FontSize="11" Foreground="{StaticResource WarnBrush}"
+                                                           Margin="6,0,0,0" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding LiveText}" FontSize="16" HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center" Margin="0,0,20,0" Foreground="{StaticResource TextDimBrush}"/>
+                                        <TextBox x:Name="target" Grid.Column="3" Style="{StaticResource Field}" Height="30" Width="130"
+                                                 HorizontalAlignment="Left" KeyDown="OnFieldKeyDown"
+                                                 Text="{Binding Target, Converter={StaticResource Float}, UpdateSourceTrigger=LostFocus}"/>
+                                        <Button x:Name="hold" Grid.Column="4" Style="{StaticResource BaseButton}" Height="30" Padding="0"
+                                                Command="{Binding DataContext.ToggleHoldCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}">
+                                            <TextBlock x:Name="holdText" Text="{ui:Caps Hold}" FontSize="10.5"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <Trigger SourceName="row" Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="row" Property="Background" Value="#66303437"/>
+                                    </Trigger>
+                                    <DataTrigger Binding="{Binding Warning, Converter={StaticResource NullVis}}" Value="Visible">
+                                        <Setter TargetName="meta" Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsHeld}" Value="True">
+                                        <Setter TargetName="bar" Property="Visibility" Value="Visible"/>
+                                        <Setter TargetName="hold" Property="Style" Value="{StaticResource PrimaryButton}"/>
+                                        <Setter TargetName="holdText" Property="Text" Value="{ui:Caps Release}"/>
+                                        <Setter TargetName="target" Property="Foreground" Value="{StaticResource EmberHiBrush}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <StackPanel Grid.Row="3" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Visibility="{Binding Stats.Count, Converter={StaticResource CountVisInv}}">
+                        <Path Data="{StaticResource Crystal}" Stroke="{StaticResource BronzeBrush}" StrokeThickness="1"
+                              Width="70" Height="94" Stretch="Uniform" Opacity="0.6" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{ui:Caps 'Load a character to read its stats', Wide=True}" Style="{StaticResource Eyebrow}"
+                                   HorizontalAlignment="Center" Margin="0,20,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <!-- ═══════════ Journal ═══════════ -->
+            <Border Grid.Row="2" Height="190" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0"
+                    Background="#F0141516"
+                    Visibility="{Binding IsJournalOpen, Converter={StaticResource BoolVis}}">
+                <ListBox x:Name="JournalList" ItemsSource="{Binding LogLines}" Background="Transparent" BorderThickness="0"
+                         Padding="14,6" FontFamily="{StaticResource MonoFont}" FontSize="11"
+                         Foreground="{StaticResource TextFaintBrush}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter Margin="0,1"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </Border>
+
+            <!-- ═══════════ Status bar ═══════════ -->
+            <Border Grid.Row="3" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Background="#F0141516">
+                <Grid Margin="18,0,8,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Rectangle Width="6" Height="6" Fill="{Binding StatusTone, Converter={StaticResource ToneBrush}}"
+                                   VerticalAlignment="Center">
+                            <Rectangle.LayoutTransform><RotateTransform Angle="45"/></Rectangle.LayoutTransform>
+                        </Rectangle>
+                        <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{StaticResource TextDimBrush}" Margin="10,0,0,0"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource LinkButton}" Command="{Binding ToggleJournalCommand}">
+                            <TextBlock Text="{ui:Caps Journal}"/>
+                        </Button>
+                        <Button Style="{StaticResource LinkButton}" Command="{Binding DiagnosticCommand}"
+                                ToolTip="Walk the pointer chain and write a detailed report">
+                            <TextBlock Text="{ui:Caps Diagnostic}"/>
+                        </Button>
+                        <Button Style="{StaticResource LinkButton}" Command="{Binding OpenLogFolderCommand}">
+                            <TextBlock Text="{ui:Caps Logs}"/>
+                        </Button>
+                        <Button Style="{StaticResource LinkButton}" Command="{Binding ToggleAboutCommand}">
+                            <TextBlock>
+                                <Run Text="{ui:Caps About}"/><Run Text="  "/>
+                                <Run Text="{Binding AppVersion, Mode=OneWay}" Foreground="{StaticResource TextFaintBrush}"/>
+                            </TextBlock>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ About ═══════════ -->
+        <Grid Visibility="{Binding IsAboutOpen, Converter={StaticResource BoolVis}}" Margin="0,40,0,0">
+            <Rectangle Fill="#C80D0E0F" MouseDown="OnBackdropClick"/>
+            <Border Width="560" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="36,32"
+                    Background="{StaticResource CharBrush}" BorderBrush="{StaticResource BronzeBrush}" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="10" Opacity="0.8" Color="Black"/>
+                </Border.Effect>
+                <StackPanel>
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock Text="{ui:Caps 'Remnant II', Wide=True}" Style="{StaticResource Eyebrow}" Foreground="{StaticResource EmberBrush}"/>
+                            <TextBlock Text="Prismforge" FontSize="30" FontWeight="Light" Margin="0,6,0,0"/>
+                            <TextBlock FontSize="12.5" Foreground="{StaticResource TextDimBrush}" Margin="0,4,0,0">
+                                <Run Text="Live prism &amp; stat editor · version"/>
+                                <Run Text="{Binding AppVersion, Mode=OneWay}"/>
+                                <Run Text="· tested on the Steam version"/>
+                            </TextBlock>
+                        </StackPanel>
+                        <Path Data="{StaticResource Crystal}" Stroke="{StaticResource TextBrush}" StrokeThickness="1" Opacity="0.12"
+                              Width="54" Height="72" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                    </Grid>
+
+                    <TextBlock Text="{ui:Caps Credits, Wide=True}" Style="{StaticResource SectionLabel}" Margin="0,28,0,10"/>
+                    <ItemsControl ItemsSource="{Binding CreditList}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="{Binding Who}" FontSize="13.5"/>
+                                    <TextBlock Text="{Binding What}" FontSize="12" Foreground="{StaticResource TextFaintBrush}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,26,0,0">
+                        <Button Style="{StaticResource BaseButton}" Command="{Binding OpenNexusCommand}" Margin="0,0,10,0"
+                                Visibility="{Binding HasNexusUrl, Converter={StaticResource BoolVis}}">
+                            <TextBlock Text="{ui:Caps 'Nexus Mods'}"/>
+                        </Button>
+                        <Button Style="{StaticResource BaseButton}" Command="{Binding OpenSourceCommand}" Margin="0,0,10,0"
+                                Visibility="{Binding HasSourceUrl, Converter={StaticResource BoolVis}}">
+                            <TextBlock Text="{ui:Caps 'Source code'}"/>
+                        </Button>
+                    </StackPanel>
+                    <Button Style="{StaticResource PrimaryButton}" Command="{Binding ToggleAboutCommand}" HorizontalAlignment="Right"
+                            MinWidth="120" Margin="0,18,0,0">
+                        <TextBlock Text="{ui:Caps Close}"/>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ First-start notice ═══════════ -->
+        <Grid Visibility="{Binding IsNoticeOpen, Converter={StaticResource BoolVis}}" Margin="0,40,0,0">
+            <Rectangle Fill="#E00D0E0F"/>
+            <Border Width="620" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="40,36"
+                    Background="{StaticResource CharBrush}" BorderBrush="{StaticResource EmberBrush}" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="10" Opacity="0.8" Color="Black"/>
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="{ui:Caps 'Before you start', Wide=True}" Style="{StaticResource Eyebrow}" Foreground="{StaticResource EmberBrush}"/>
+                    <TextBlock Text="This tool edits the running game" FontSize="26" FontWeight="Light" Margin="0,6,0,20" TextWrapping="Wrap"/>
+
+                    <ItemsControl>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="20"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Path Data="M4,0 L8,4 L4,8 L0,4 Z" Width="8" Height="8" Fill="{StaticResource EmberBrush}"
+                                          VerticalAlignment="Top" Margin="0,5,0,0"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding}" FontSize="13.5" TextWrapping="Wrap" LineHeight="20"
+                                               Foreground="{StaticResource TextBrush}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        <ItemsControl.ItemsSource>
+                            <x:Array Type="{x:Type sys:String}" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                                <sys:String>Back up your saves first: %USERPROFILE%\Saved Games\Remnant2. The game writes your edits into the save at its next autosave.</sys:String>
+                                <sys:String>Unusual values can crash the game. The Attributes page warns about risky values but never blocks them.</sys:String>
+                                <sys:String>Held attributes stay active after you close this app, until you press Release all or restart the game.</sys:String>
+                                <sys:String>A changed legendary segment takes full effect after you reload your character.</sys:String>
+                                <sys:String>Think of others in co-op: extreme stats affect their game too.</sys:String>
+                                <sys:String>Tested on the Steam version of Remnant 2. Game Pass is not supported yet.</sys:String>
+                            </x:Array>
+                        </ItemsControl.ItemsSource>
+                    </ItemsControl>
+
+                    <Button Style="{StaticResource PrimaryButton}" Command="{Binding AcceptNoticeCommand}" HorizontalAlignment="Right"
+                            MinWidth="170" Margin="0,14,0,0">
+                        <TextBlock Text="{ui:Caps 'I understand', Wide=True}"/>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

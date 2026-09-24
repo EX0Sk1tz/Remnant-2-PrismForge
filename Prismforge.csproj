@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>R2PrismRuntime</RootNamespace>
+    <AssemblyName>Prismforge</AssemblyName>
+    <!-- The game is 64-bit; reading its module list requires a 64-bit process. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Version>1.0.0</Version>
+    <Product>Prismforge</Product>
+    <Company>EX0Sk1tz</Company>
+    <Authors>EX0Sk1tz</Authors>
+    <Description>Prismforge: live prism and stat editor for Remnant II (Steam).</Description>
+    <Copyright>Unofficial fan tool. Not affiliated with Gunfire Games.</Copyright>
+    <!-- App icon: replace Assets\app.ico to change it (exe, taskbar and window use the same file). -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- Release: one self-contained exe, no .NET install needed. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Data\SegmentCatalog.json" />
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+</Project>

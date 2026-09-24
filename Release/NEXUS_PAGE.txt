@@ -1,0 +1,80 @@
+=== Nexus Mods page draft (BBCode) ===
+Mod title:
+Prismforge - Live Prism & Stat Editor for Remnant II
+
+Summary line (short description field):
+Edit prisms and character attributes in Remnant II while the game runs. Change segment stats and levels, hold any stat past its normal limit. Steam version.
+
+--- Description (paste into the description editor, BBCode mode) ---
+
+[size=5][b]Prismforge[/b][/size]
+[b]Live prism & stat editor for Remnant II[/b]
+
+Edit your [b]prisms[/b] and [b]character attributes[/b] while Remnant II is running. Change a value, press Apply, and it is live in game. No save-file swapping.
+
+[b][color=#e07b3c]Tested on the Steam version.[/color][/b] Game Pass is not supported yet.
+
+[size=4][b]Features[/b][/size]
+[list]
+[*][b]All prisms on your character[/b] with name, level, segments and fed fragments
+[*][b]Change any segment[/b]: 45 standard stats, 23 fusions, 42 legendaries, with in-game names and descriptions
+[*][b]Change segment levels and pending XP[/b]
+[*]Edits are staged and only written on [b]Apply[/b]; every write is read back and confirmed
+[*][b]Discard[/b] and [b]Revert to session start[/b] to undo
+[*][b]Attributes[/b]: live list of ~220 character stats (damage, crit, weak spot, speeds, resistances, caps)
+[*][b]Hold[/b] any stat at your value, even when the game recalculates it
+[*][b]Soft warnings[/b] for risky values (above a game cap, chances over 100 %, reductions at 100 %)
+[*]Connects to the game by itself, no admin rights, single self-contained exe
+[/list]
+
+[b]Note:[/b] segment levels above 10 do not raise a prism bonus, the game stops at 10. Use Attributes to go past normal limits.
+
+[size=4][b]Installation[/b][/size]
+[list=1]
+[*][b]Back up your saves[/b]: copy [i]%USERPROFILE%\Saved Games\Remnant2[/i] somewhere safe
+[*]Unzip anywhere
+[*]Start Remnant II and load a character
+[*]Run [b]Prismforge.exe[/b]
+[/list]
+Uninstall: delete the exe. Settings and logs are in [i]%LocalAppData%\Prismforge[/i].
+
+[size=4][b]Please read[/b][/size]
+[list]
+[*]Edits end up in your save at the next autosave. [b]Back up first.[/b]
+[*]Unusual values can crash the game. Start moderate.
+[*]Held attributes stay active after closing the editor until you press [b]Release all[/b] or restart the game.
+[*]Changed legendary segments take full effect after reloading your character.
+[*]In co-op, extreme stats affect other players too.
+[*]If the Cheat Engine table's "System Statistics" script is active, disable it before using Hold.
+[/list]
+
+[size=4][b]Antivirus[/b][/size]
+The editor reads and writes the game's memory and, for Hold, patches one instruction in the running game. Some antivirus tools flag every program that does this. Source code: [url=https://github.com/EX0Sk1tz/Remnant-2-PrismForge]GitHub[/url].
+
+[size=4][b]Known limitations[/b][/size]
+[list]
+[*]Game Pass / Microsoft Store version not supported
+[*]Fed-fragment editing untested on prisms that have fed fragments
+[*]Replacing an action-based legendary (e.g. Unbreakable) may keep the old effect until reload
+[/list]
+
+[size=4][b]Bug reports[/b][/size]
+Press [b]Diagnostic[/b] in the editor's bottom bar and attach the report from [b]Logs[/b], plus what you did.
+
+[size=4][b]Credits[/b][/size]
+[list]
+[*][b]Paul44[/b]: Remnant 2 Cheat Engine table (pointer chain, prism layout, stat hook point)
+[*][b]kiamchyearktng[/b]: R2PrismEditor save editor (prism segment data tables and names)
+[*][b]Andrew Savinykh, t1nky, crackedmind[/b]: lib.remnant2.saves
+[/list]
+
+[size=4][b]License[/b][/size]
+MIT License, © 2026 EX0Sk1tz. Source code: [url=https://github.com/EX0Sk1tz/Remnant-2-PrismForge]GitHub[/url].
+
+Unofficial fan tool, not affiliated with Gunfire Games or Gearbox Publishing. Use at your own risk.
+
+--- Suggested settings ---
+Category: Utilities
+Tags: Tool, Cheats, Prism, Save editing
+Requirements: none
+Screenshots: Prisms tab, the Change picker open, Attributes tab with a held stat, About panel

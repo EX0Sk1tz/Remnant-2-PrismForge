@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+publish/
+logs/
+
+# Release packages (uploaded to Nexus / GitHub Releases, not committed)
+Release/*.zip
+
+# IDE state
+.vs/
+*.user
+*.suo
+
+# Stray folder from an early shell mishap
+/{Memory,Game,Models,UI}/
