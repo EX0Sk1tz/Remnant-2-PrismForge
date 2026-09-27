@@ -24,6 +24,27 @@ public partial class PrismData : ObservableObject
 
     public int InternalLevel { get; set; }
 
+    /// CurrentSegments.Max: slots the game allocated. Only a game-grown array has spare ones.
+    public int SegmentCapacity { get; set; }
+
+    /// True after "Make room" until the game reallocates the array (then the legendary pick is back).
+    public bool HasRoomBackup { get; set; }
+
+    /// The game's allocator was found, so Add segment can give a full array a bigger buffer.
+    public bool CanGrow { get; set; }
+
+    public int SpareSegmentSlots => Math.Max(0, SegmentCapacity - Segments.Count);
+    public bool CanAddSegment => SpareSegmentSlots > 0 || CanGrow;
+    public bool CanMakeRoom => !CanAddSegment && !HasRoomBackup && Segments.Any(s => s.Def.Kind == SegmentKind.Legendary);
+    /// Make room is only the fallback for when the allocator wasn't found.
+    public bool ShowMakeRoom => !CanGrow && !HasRoomBackup;
+
+    public string RoomText =>
+        SpareSegmentSlots > 0 ? $"{SpareSegmentSlots} spare slot(s). An added segment is saved with your character. Back up your save first."
+        : CanGrow ? "The list is full; Add segment first gets it more room from the game's own allocator. An added segment is saved with your character. Back up your save first."
+        : "No spare slots. The game only reserves room when it adds a segment itself, and loading a save allocates exactly what is used. Make room takes the legendary off the list so the game re-adds it with room to spare.";
+    public bool CanReset => Segments.Count > 0 || Feeds.Count > 0 || Xp != 0 || InternalLevel != 0;
+
     public ObservableCollection<SegmentSlot> Segments { get; } = new();
     public ObservableCollection<FeedSlot> Feeds { get; } = new();
 
@@ -122,7 +143,8 @@ public abstract partial class SlotBase : ObservableObject
     public bool IsLevelDirty => EditLevel != Level;
     public bool IsDirty => IsRowDirty || IsLevelDirty;
 
-    public const int MaxLevel = 999;
+    /// Highest level the editor accepts for this kind of slot.
+    public virtual int MaxLevel => 999;
 
     // A ComboBox pushes null when its selection is cleared; never let that reach the model.
     partial void OnEditDefChanged(SegmentDef value)
@@ -149,13 +171,60 @@ public abstract partial class SlotBase : ObservableObject
     }
 }
 
-/// <summary>One element of CurrentSegments (stride 0x28).</summary>
+/// <summary>
+/// One element of CurrentSegments (stride 0x28). Tested on Steam: the game stores any level and
+/// keeps it through save and reload, but standard segments read their bonus from a curve that
+/// ends at level 10 (higher levels give the level-10 value), while fusion bonuses are
+/// per-level × level with no cap. New bonuses take effect when the prism is re-equipped.
+/// </summary>
 public sealed partial class SegmentSlot : SlotBase
 {
+    /// Level where standard bonuses stop growing.
+    public const int NormalMaxLevel = 10;
+
+    /// Fusion levels above this get a warning: the bonus is 10× the normal maximum.
+    public const int FusionWarnLevel = 100;
+
+    /// The game sums segment levels into the prism level (an int32); this keeps six maxed
+    /// segments well inside that range.
+    public override int MaxLevel => 100_000_000;
+
+    public SegmentSlot()
+    {
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(EditLevel) or nameof(EditDef))
+            {
+                OnPropertyChanged(nameof(LevelNote));
+                OnPropertyChanged(nameof(IsLevelRisky));
+            }
+        };
+    }
+
     /// Cached object pointer at +0x20. The CT reads the name from it for legendary segments.
     public ulong ObjectPtr { get; set; }
 
     public string Header => $"Segment {Index + 1}";
+
+    public bool IsLevelRisky => EditDef.Kind == SegmentKind.Fusion && EditLevel > FusionWarnLevel;
+
+    /// What a level above the normal maximum does for this segment (null when nothing to say).
+    public string? LevelNote
+    {
+        get
+        {
+            if (EditLevel <= NormalMaxLevel) return null;
+            string factor = (EditLevel / (double)NormalMaxLevel).ToString("#,0.#");
+            return EditDef.Kind switch
+            {
+                SegmentKind.Standard => $"No extra effect above level {NormalMaxLevel}: the bonus stays at its level-{NormalMaxLevel} value. Only the prism level goes up.",
+                SegmentKind.Fusion when IsLevelRisky =>
+                    $"Fusion bonus {factor}× the level-{NormalMaxLevel} value. Extreme bonuses can break the game (for example cooldowns below zero), and the level is saved with your character.",
+                SegmentKind.Fusion => $"Fusion bonus scales with level: {factor}× the level-{NormalMaxLevel} value.",
+                _ => null,
+            };
+        }
+    }
 }
 
 /// <summary>A computed character stat, optionally held at a fixed value by the stat hook.</summary>

@@ -56,9 +56,13 @@ public partial class MainWindow : Window
                     await Task.Delay(150);
                     var src = cb.ItemsSource as System.Collections.IEnumerable;
                     int srcCount = src?.Cast<object>().Count() ?? -1;
+                    // What the popup actually shows: its height and how many item containers exist.
+                    var popupChild = (cb.Template.FindName("PART_Popup", cb) as System.Windows.Controls.Primitives.Popup)?.Child as FrameworkElement;
+                    int containers = Enumerable.Range(0, cb.Items.Count).Count(i => cb.ItemContainerGenerator.ContainerFromIndex(i) != null);
                     Diagnostics.Log.Info($"SELFTEST round {round} '{prism.Name}' picker {idx}: Items={cb.Items.Count} " +
                                          $"source={srcCount} sourceType={cb.ItemsSource?.GetType().Name ?? "null"} " +
-                                         $"selected='{(cb.SelectedItem as Game.SegmentDef)?.Name}'");
+                                         $"selected='{(cb.SelectedItem as Game.SegmentDef)?.Name}' popupHeight={popupChild?.ActualHeight:0} " +
+                                         $"containers={containers} generator={cb.ItemContainerGenerator.Status} groups={cb.Items.Groups?.Count ?? -1}");
                     cb.IsDropDownOpen = false;
                 }
             }

@@ -5,7 +5,7 @@
 Edit your prisms and character attributes in **Remnant II while the game is running**.
 No save-file juggling: change a value, press Apply, and it is live in the game.
 
-**Tested on the Steam version.** The Game Pass version is not supported yet.
+**Tested on the Steam and Game Pass versions.**
 
 ---
 
@@ -19,6 +19,12 @@ No save-file juggling: change a value, press Apply, and it is live in the game.
   to confirm it.
 - **Discard** drops staged edits; **Revert to session start** restores what the prism looked like
   when the editor first saw it.
+- Segment levels up to 100,000,000. **Fusion** bonuses keep scaling with level (Lv 20 = twice the
+  Lv 10 bonus); **standard** segments stop gaining at level 10. Each segment row says which applies.
+- **Extra segments (experimental)**: **Add segment** appends segments beyond the usual six into room
+  the game reserved itself. **Make room** gets that room on a prism that already has its legendary
+  (see Usage).
+- Remove or reorder any segment or fed fragment, or **Reset prism** to a blank one.
 
 **Attributes**
 - Live list of about 220 character stats (damage, crit, weak spot, speeds, resistances, caps…).
@@ -27,15 +33,15 @@ No save-file juggling: change a value, press Apply, and it is live in the game.
 - Soft warnings for risky values, e.g. a stat above its game cap, chances above 100 %, reductions
   at 100 % or more. Nothing is blocked.
 
-Segment levels above 10 do **not** raise a prism bonus; the game stops at level 10. Use Attributes
-to go beyond normal limits.
+**Support**
+- **Support zip** packs logs, diagnostic reports and a short state summary into one file for bug reports.
 
 ---
 
 ## Requirements
 
 - Windows 10 or 11, 64-bit.
-- Remnant II (Steam).
+- Remnant II (Steam or Game Pass / Microsoft Store).
 - Nothing else. The exe is self-contained, no .NET install needed, no admin rights needed.
 
 ## Installation
@@ -55,7 +61,25 @@ To uninstall, delete the exe. Settings and logs live in `%LocalAppData%\Prismfor
 1. Pick a prism on the left.
 2. Use **Change** to pick a new stat for a segment, − / + for its level, or type a new pending XP.
 3. Staged changes are marked in amber. Press **Apply to game**.
-4. The game saves your edits at its next autosave.
+4. **Unequip and re-equip the prism** in game: the game applies segment bonuses on equip.
+5. The game saves your edits at its next autosave.
+
+**Extra segments (experimental)**
+- **Add segment** works at any time: if the prism's list is full, Prismforge first gives it more room
+  through the game's own memory allocator. The steps below are only needed if that allocator isn't
+  found (the Make room button then appears).
+- The game reserves spare room in a prism's segment list only when it adds a segment itself (the
+  legendary pick after a level-up), and only in that session. While there is room, **Add segment**
+  is active.
+- On a prism that already has its legendary: press **Make room** (the legendary is taken off), give
+  the prism some pending XP and Apply, then pick the legendary again in game. The editor puts the
+  other segments back and Add segment becomes active. Keep Prismforge open in between;
+  **Restore legendary** undoes Make room until the pick.
+- Hover a segment row: the arrows move it up or down, the bin icon removes it. Fed fragments have a
+  bin icon too. These are written to the game right away (no Apply). A removed segment's slot is
+  spare room, so Add segment works right after.
+- **Reset prism** makes the prism blank again (no segments, no fed fragments, XP and level 0), for
+  example to start over on a prism you changed days ago. It asks first.
 
 **Attributes tab**
 1. Search or filter the stats.
@@ -78,20 +102,44 @@ To go faster than normal, raise `MoveSpeed` **and** `MoveSpeedCap`.
 - **Antivirus:** the editor reads and writes the game's memory and patches one instruction for
   Hold. Some antivirus tools flag any program that does this. The source code is linked on the mod page.
 - If the Cheat Engine table's "System Statistics" script is active, disable it before using Hold.
+- **Extreme fusion levels** (hundreds and up) give huge bonuses and can break the game, for example
+  cooldowns below zero. Levels are saved with your character.
+
+## Start options
+
+Some features are switched on with a start option: a word you add after the program name when you
+start it. Double-clicking `Prismforge.exe` starts it without options.
+
+**How to start with an option (shortcut, once):**
+1. Right-click `Prismforge.exe` → **Show more options** (Windows 11) → **Create shortcut**.
+2. Right-click the new shortcut → **Properties**.
+3. In **Target**, click at the very end, after the closing quote, add a space and the option, e.g.
+   `"C:\Tools\Prismforge\Prismforge.exe" --verbose`
+4. **OK**. From now on, start Prismforge with this shortcut when you want the option, and with the
+   exe itself when you don't. Several options go one after another, separated by spaces.
+
+**Or once, from a console:** Shift + right-click in the folder with `Prismforge.exe` →
+**Open PowerShell window here** (Windows 11: right-click → **Open in Terminal**), then type
+`.\Prismforge.exe --verbose` and press Enter.
+
+| Option | What it does |
+|---|---|
+| `--verbose` | More detailed logs, useful for bug reports. |
+| `--diagnose` | Writes a diagnostic report after the first scan. |
 
 ## Known limitations
 
-- Game Pass / Microsoft Store version not supported.
-- Fed-fragment editing is implemented but has not been tested on a prism that has fed fragments.
+- Fed-fragment editing is implemented but untested.
+- Legendary segment levels above 1 count into the prism level; whether the effect scales is untested.
 - Replacing a legendary that works through an action (e.g. Unbreakable) may keep the old effect
   until you reload.
 
 ## Troubleshooting
 
-- **"Looking for Remnant 2"**: start the game (Steam version).
+- **"Looking for Remnant 2"**: start the game.
 - **"Waiting for character"**: load into the world; the main menu has no character.
-- Anything else: press **Diagnostic** in the bottom bar and attach the report from **Logs**
-  to your bug report, together with what you did.
+- Anything else: press **Support zip** in the bottom bar and attach the zip to your bug report,
+  together with what you did.
 
 ---
 

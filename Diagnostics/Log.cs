@@ -36,6 +36,7 @@ public static class Log
                 Directory.CreateDirectory(LogDirectory);
                 Prune("Prismforge_*.log", KeepFiles - 1);
                 Prune("Prismforge_Diag_*.txt", KeepFiles);
+                Prune("Prismforge_Support_*.zip", 3);
                 FilePath = Path.Combine(LogDirectory, $"Prismforge_{DateTime.Now:yyyyMMdd_HHmmss}.log");
                 _writer = new StreamWriter(FilePath, append: false, Encoding.UTF8) { AutoFlush = true };
             }
@@ -45,8 +46,18 @@ public static class Log
                 _writer = null;
             }
         }
-        Info($"{AppInfo.Name} {AppInfo.Version}. .NET {Environment.Version}, OS {Environment.OSVersion}, 64-bit process: {Environment.Is64BitProcess}");
+        Info($"{AppInfo.Name} {AppInfo.Version}. {AppInfo.EnvironmentLine()}");
+        string[] args = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        Info($"Arguments: {(args.Length == 0 ? "(none)" : string.Join(" ", args))}. Log level: {MinLevel}.");
         Debug($"Log file: {FilePath}");   // Debug: keeps the user's profile path out of the Journal panel
+    }
+
+    /// Lowers the level at runtime (e.g. an untested game build was found) and says so in the log.
+    public static void RaiseDetail(LogLevel level, string why)
+    {
+        if (level >= MinLevel) return;
+        MinLevel = level;
+        Info($"Log level lowered to {level}: {why}");
     }
 
     /// Deletes all but the newest <paramref name="keep"/> files matching <paramref name="pattern"/>.

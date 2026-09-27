@@ -27,7 +27,7 @@ public sealed class ObjectArray
     public ObjectArray(ProcessMemory mem) => _mem = mem;
 
     // mov rax,[rip+X]; mov rcx,[rax+rcx*8]; lea rax,[rcx+rdx*8]  — the common chunk lookup.
-    private static readonly (byte[] Pattern, bool[] Mask)[] Signatures =
+    internal static readonly (byte[] Pattern, bool[] Mask)[] Signatures =
     {
         (new byte[] { 0x48, 0x8B, 0x05, 0, 0, 0, 0, 0x48, 0x8B, 0x0C, 0xC8, 0x48, 0x8D, 0x04, 0xD1 },
          new[] { true, true, true, false, false, false, false, true, true, true, true, true, true, true, true }),
@@ -140,5 +140,41 @@ public sealed class ObjectArray
 
         Log.Info($"Default-object search: {found.Count}/{nameIds.Count} found among {num} objects in {sw.ElapsedMilliseconds} ms.");
         return new Dictionary<int, ulong>(found);
+    }
+
+    /// Finds live instances (not class default objects) whose class FName ComparisonIndex is
+    /// <paramref name="classNameId"/>, e.g. every Character_Master_Player_C in the session.
+    public List<ulong> FindInstances(int classNameId)
+    {
+        var found = new ConcurrentBag<ulong>();
+        if (!IsReady) return new();
+        var sw = Stopwatch.StartNew();
+        ulong table = _mem.ReadPointer(_field);
+        int num = Count;
+        int chunks = (num + ChunkSize - 1) / ChunkSize;
+        var classIds = new ConcurrentDictionary<ulong, int>();   // class pointer → its FName id
+
+        Parallel.For(0, chunks, new ParallelOptions { MaxDegreeOfParallelism = 4 }, c =>
+        {
+            ulong chunk = _mem.ReadPointer(table + (ulong)c * 8);
+            if (chunk == 0) return;
+            int items = Math.Min(ChunkSize, num - c * ChunkSize);
+            var buf = new byte[items * _stride];
+            if (!_mem.TryReadBytes(chunk, buf, buf.Length)) return;
+            var head = new byte[0x1C];
+            for (int i = 0; i < items; i++)
+            {
+                ulong obj = BitConverter.ToUInt64(buf, i * _stride);
+                if (obj == 0 || !_mem.TryReadBytes(obj, head, head.Length)) continue;
+                if ((BitConverter.ToUInt32(head, 0x08) & 0x10) != 0) continue;   // skip RF_ClassDefaultObject
+                ulong cls = BitConverter.ToUInt64(head, 0x10);
+                if (cls == 0) continue;
+                int clsName = classIds.GetOrAdd(cls, k => _mem.ReadInt32(k + 0x18));
+                if (clsName == classNameId) found.Add(obj);
+            }
+        });
+
+        Log.Info($"Instance search: {found.Count} object(s) of class id {classNameId} among {num} objects in {sw.ElapsedMilliseconds} ms.");
+        return found.OrderBy(o => o).ToList();
     }
 }

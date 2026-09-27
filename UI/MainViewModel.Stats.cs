@@ -82,6 +82,11 @@ public partial class MainViewModel
         var rows = _stats.Read(_scanner.LastPawn);
         if (rows.Count == 0) return;
 
+        // Stats that left the array keep no address, so nothing writes to a slot that now holds another stat.
+        var present = rows.Select(r => r.NameId).ToHashSet();
+        foreach (var s in Stats)
+            if (!present.Contains(s.NameId)) s.Address = 0;
+
         foreach (var r in rows)
         {
             if (!_statsById.TryGetValue(r.NameId, out var s))
@@ -99,7 +104,7 @@ public partial class MainViewModel
             s.Address = r.Address;
             s.Live = r.Value;
             if (!s.IsHeld && !s.TargetEdited) s.SyncTarget(r.Value);
-            if (s.IsHeld && Math.Abs(s.Live - s.Target) > 0.0001f) _stats.WriteValue(s.Address, s.Target, quiet: true);
+            if (s.IsHeld && Math.Abs(s.Live - s.Target) > 0.0001f) _stats.WriteValue(s.Address, s.NameId, s.Target, quiet: true);
         }
 
         if (_adopted.Count > 0)
@@ -138,8 +143,21 @@ public partial class MainViewModel
         if (e.PropertyName == nameof(StatEntry.Target) && sender is StatEntry { IsHeld: true } s)
         {
             PushOverrides();
-            _stats?.WriteValue(s.Address, s.Target, quiet: false);
+            WriteStat(s);
         }
+    }
+
+    /// Writes a stat's target directly. If its row moved since the last refresh, re-reads the list to
+    /// find it again; if it is gone, only the hook override applies.
+    private void WriteStat(StatEntry s)
+    {
+        if (_stats == null || _scanner == null) return;
+        if (_stats.WriteValue(s.Address, s.NameId, s.Target, quiet: false)) return;
+
+        var row = _stats.Read(_scanner.LastPawn).FirstOrDefault(r => r.NameId == s.NameId);
+        s.Address = row.Address;
+        if (row.NameId != 0 && _stats.WriteValue(row.Address, s.NameId, s.Target, quiet: false)) return;
+        Log.Warn($"Stat '{s.Name}' is not in the game's stat list right now; direct write skipped.");
     }
 
     private void PushOverrides()
@@ -171,6 +189,11 @@ public partial class MainViewModel
         }
         else
         {
+            if (IsReadOnly)
+            {
+                SetStatus("Read-only on this untested game version. Start Prismforge with --allow-untested-writes to hold stats.", Tone.Warn);
+                return;
+            }
             if (!_hook.Install())
             {
                 SetStatus("Stat hook unavailable: " + _hook.Detail, Tone.Bad);
@@ -185,7 +208,7 @@ public partial class MainViewModel
             s.IsHeld = true;
             HeldStats.Add(s);
             PushOverrides();
-            _stats.WriteValue(s.Address, s.Target, quiet: false);
+            WriteStat(s);
             SetStatus($"{s.DisplayName} held at {s.Target:0.###}.", Tone.Good);
         }
         SyncHook();

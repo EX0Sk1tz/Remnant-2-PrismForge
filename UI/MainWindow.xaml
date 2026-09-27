@@ -399,6 +399,7 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
                                                 <Rectangle x:Name="dirtyBar" Fill="{StaticResource PendingBrush}" Visibility="Hidden" Margin="0,10"/>
@@ -426,6 +427,9 @@
                                                     <TextBlock x:Name="legendNote" FontSize="11.5" Foreground="{StaticResource TextFaintBrush}"
                                                                Margin="0,4,0,0" Visibility="Collapsed" TextWrapping="Wrap"
                                                                Text="Legendary effects are rebuilt from the saved row. Save and reload your character after applying."/>
+                                                    <TextBlock x:Name="levelNote" Text="{Binding LevelNote}" FontSize="11.5" Foreground="{StaticResource TextFaintBrush}"
+                                                               Margin="0,4,0,0" TextWrapping="Wrap"
+                                                               Visibility="{Binding LevelNote, Converter={StaticResource NullVis}}"/>
                                                 </StackPanel>
 
                                                 <ComboBox x:Name="picker" Grid.Column="4" Style="{StaticResource StatPicker}"
@@ -449,11 +453,34 @@
                                                         CommandParameter="{Binding}">
                                                     <Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{StaticResource TextDimBrush}" StrokeThickness="1.2"/>
                                                 </Button>
+
+                                                <!-- Order and removal: written to the game right away, like Add segment -->
+                                                <StackPanel x:Name="arrange" Grid.Column="8" Orientation="Horizontal" Margin="14,0,4,0"
+                                                            VerticalAlignment="Center" Visibility="Hidden">
+                                                    <Button Style="{StaticResource LinkButton}" Padding="4" ToolTip="Move up (written to the game right away)"
+                                                            Command="{Binding DataContext.MoveSegmentUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Path Data="M0,5 L4,1 L8,5" Stroke="{StaticResource TextDimBrush}" StrokeThickness="1.2"/>
+                                                    </Button>
+                                                    <Button Style="{StaticResource LinkButton}" Padding="4" ToolTip="Move down (written to the game right away)"
+                                                            Command="{Binding DataContext.MoveSegmentDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Path Data="M0,1 L4,5 L8,1" Stroke="{StaticResource TextDimBrush}" StrokeThickness="1.2"/>
+                                                    </Button>
+                                                    <Button Style="{StaticResource LinkButton}" Padding="4" Margin="6,0,0,0"
+                                                            ToolTip="Remove this segment from the prism (written to the game right away). Its slot becomes room for Add segment."
+                                                            Command="{Binding DataContext.RemoveSegmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Path Data="M0,2 H10 M3,2 V0.5 H7 V2 M1.5,2 L2.3,11 H7.7 L8.5,2 M4,4.5 V8.5 M6,4.5 V8.5"
+                                                              Stroke="{StaticResource BadBrush}" StrokeThickness="1.1"/>
+                                                    </Button>
+                                                </StackPanel>
                                             </Grid>
                                         </Border>
                                         <DataTemplate.Triggers>
                                             <Trigger SourceName="row" Property="IsMouseOver" Value="True">
                                                 <Setter TargetName="row" Property="Background" Value="#66303437"/>
+                                                <Setter TargetName="arrange" Property="Visibility" Value="Visible"/>
                                             </Trigger>
                                             <DataTrigger Binding="{Binding IsDirty}" Value="True">
                                                 <Setter TargetName="dirtyBar" Property="Visibility" Value="Visible"/>
@@ -461,6 +488,9 @@
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding IsRowDirty}" Value="True">
                                                 <Setter TargetName="was" Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsLevelRisky}" Value="True">
+                                                <Setter TargetName="levelNote" Property="Foreground" Value="{StaticResource WarnBrush}"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Def.Kind}" Value="{x:Static g:SegmentKind.Legendary}">
                                                 <Setter TargetName="picker" Property="ItemsSource"
@@ -482,8 +512,52 @@
                             <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Padding="12,22"
                                     Visibility="{Binding Segments.Count, Converter={StaticResource CountVisInv}}">
                                 <TextBlock FontSize="13" Foreground="{StaticResource TextFaintBrush}" TextWrapping="Wrap"
-                                           Text="This prism has no segments yet. Segments appear as the prism levels up in game; the editor can only change segments that exist."/>
+                                           Text="This prism has no segments. Segments appear as the prism levels up in game. If spare slots are shown below, Add segment works right away."/>
                             </Border>
+
+                            <!-- ─── Extra segments (experimental) ─── -->
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="12,0,16,0">
+                                    <TextBlock Text="{ui:Caps 'Extra segments · experimental'}" Style="{StaticResource Eyebrow}"/>
+                                    <TextBlock FontSize="12" Foreground="{StaticResource TextFaintBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                               Visibility="{Binding HasRoomBackup, Converter={StaticResource BoolVisInv}}"
+                                               Text="{Binding RoomText}"/>
+                                    <TextBlock FontSize="12" Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                               Visibility="{Binding HasRoomBackup, Converter={StaticResource BoolVis}}"
+                                               Text="Legendary (and any segments beyond the fifth) taken off the list: the game only adds a segment while a prism has at most 5. Give the prism XP (Pending XP, then Apply) and pick the legendary again in game. The editor then puts the extra segments back and Add segment becomes available. Keep Prismforge open until then."/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Style="{StaticResource BaseButton}" Padding="12,0" Height="26" Margin="0,0,6,0"
+                                        IsEnabled="{Binding CanMakeRoom}"
+                                        Visibility="{Binding ShowMakeRoom, Converter={StaticResource BoolVis}}"
+                                        Command="{Binding DataContext.MakeRoomCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        ToolTip="Take the legendary off the list and mark the segment array full. Pick the legendary again in game and the game reserves spare room for Add segment.">
+                                    <TextBlock Text="{ui:Caps 'Make room'}" FontSize="10.5"/>
+                                </Button>
+                                <Button Grid.Column="1" Style="{StaticResource BaseButton}" Padding="12,0" Height="26" Margin="0,0,6,0"
+                                        Visibility="{Binding HasRoomBackup, Converter={StaticResource BoolVis}}"
+                                        Command="{Binding DataContext.RestoreRoomCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        ToolTip="Put the legendary back and undo Make room (only until the game re-adds a legendary)">
+                                    <TextBlock Text="{ui:Caps 'Restore legendary'}" FontSize="10.5"/>
+                                </Button>
+                                <Button Grid.Column="2" Style="{StaticResource BaseButton}" Padding="12,0" Height="26" Margin="0,0,6,0"
+                                        IsEnabled="{Binding CanReset}"
+                                        Command="{Binding DataContext.ResetPrismCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        ToolTip="Make this a blank prism: remove every segment and fed fragment, XP and level to 0. Asks first. The freed slots stay available for Add segment this session.">
+                                    <TextBlock Text="{ui:Caps 'Reset prism'}" FontSize="10.5" Foreground="{StaticResource BadBrush}"/>
+                                </Button>
+                                <Button Grid.Column="3" Style="{StaticResource BaseButton}" Padding="12,0" Height="26"
+                                        IsEnabled="{Binding CanAddSegment}"
+                                        Command="{Binding DataContext.AddSegmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        ToolTip="Append a segment. It gets a fusion you don't have yet at level 10; change it like any other segment. A full list first gets a bigger buffer from the game's own allocator.">
+                                    <TextBlock Text="{ui:Caps 'Add segment'}" FontSize="10.5"/>
+                                </Button>
+                            </Grid>
 
                             <!-- ─── Fed fragments ─── -->
                             <StackPanel Visibility="{Binding Feeds.Count, Converter={StaticResource CountVis}}">
@@ -524,6 +598,7 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <Rectangle x:Name="dirtyBar" Fill="{StaticResource PendingBrush}" Visibility="Hidden"/>
                                                     <ui:Gem Grid.Column="1" Def="{Binding EditDef}" Width="14" Height="18" HorizontalAlignment="Center"
@@ -538,7 +613,15 @@
                                                         </ComboBox.GroupStyle>
                                                     </ComboBox>
                                                     <ContentPresenter Grid.Column="4" Content="{Binding}" ContentTemplate="{StaticResource Stepper}"
-                                                                      Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                                                      Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                    <Button x:Name="remove" Grid.Column="5" Style="{StaticResource LinkButton}" Padding="4" Margin="0,0,8,0"
+                                                            VerticalAlignment="Center" Visibility="Hidden"
+                                                            ToolTip="Remove this fed fragment (written to the game right away)"
+                                                            Command="{Binding DataContext.RemoveFeedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Path Data="M0,2 H10 M3,2 V0.5 H7 V2 M1.5,2 L2.3,11 H7.7 L8.5,2 M4,4.5 V8.5 M6,4.5 V8.5"
+                                                              Stroke="{StaticResource BadBrush}" StrokeThickness="1.1"/>
+                                                    </Button>
                                                 </Grid>
                                             </Border>
                                             <DataTemplate.Triggers>
@@ -547,6 +630,7 @@
                                                 </DataTrigger>
                                                 <Trigger SourceName="card" Property="IsMouseOver" Value="True">
                                                     <Setter TargetName="card" Property="BorderBrush" Value="{StaticResource BronzeBrush}"/>
+                                                    <Setter TargetName="remove" Property="Visibility" Value="Visible"/>
                                                 </Trigger>
                                             </DataTemplate.Triggers>
                                         </DataTemplate>
@@ -875,6 +959,10 @@
                         <Button Style="{StaticResource LinkButton}" Command="{Binding OpenLogFolderCommand}">
                             <TextBlock Text="{ui:Caps Logs}"/>
                         </Button>
+                        <Button Style="{StaticResource LinkButton}" Command="{Binding CreateSupportZipCommand}"
+                                ToolTip="Pack logs, diagnostic reports and a state summary into one zip to send for support">
+                            <TextBlock Text="{ui:Caps 'Support zip'}"/>
+                        </Button>
                         <Button Style="{StaticResource LinkButton}" Command="{Binding ToggleAboutCommand}">
                             <TextBlock>
                                 <Run Text="{ui:Caps About}"/><Run Text="  "/>
@@ -902,7 +990,7 @@
                             <TextBlock FontSize="12.5" Foreground="{StaticResource TextDimBrush}" Margin="0,4,0,0">
                                 <Run Text="Live prism &amp; stat editor · version"/>
                                 <Run Text="{Binding AppVersion, Mode=OneWay}"/>
-                                <Run Text="· tested on the Steam version"/>
+                                <Run Text="· tested on Steam and Game Pass"/>
                             </TextBlock>
                         </StackPanel>
                         <Path Data="{StaticResource Crystal}" Stroke="{StaticResource TextBrush}" StrokeThickness="1" Opacity="0.12"
@@ -973,7 +1061,7 @@
                                 <sys:String>Held attributes stay active after you close this app, until you press Release all or restart the game.</sys:String>
                                 <sys:String>A changed legendary segment takes full effect after you reload your character.</sys:String>
                                 <sys:String>Think of others in co-op: extreme stats affect their game too.</sys:String>
-                                <sys:String>Tested on the Steam version of Remnant 2. Game Pass is not supported yet.</sys:String>
+                                <sys:String>Tested on the Steam and Game Pass versions of Remnant 2.</sys:String>
                             </x:Array>
                         </ItemsControl.ItemsSource>
                     </ItemsControl>

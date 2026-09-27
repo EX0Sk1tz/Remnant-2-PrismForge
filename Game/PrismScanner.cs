@@ -339,14 +339,11 @@ public class PrismScanner
 
     /// Writes every step of the pointer chain (with class names and neighbour probes) plus an
     /// inventory dump into the logs folder. Returns the report path.
-    public string RunDiagnostic()
+    public string RunDiagnostic(GameTarget? target, string reason = "manual")
     {
         var r = new DiagReport(keep: true);
-        r.Line("=== Prismforge — pointer diagnostic ===");
-        r.Line($"Time: {DateTime.Now}");
-        r.Line($"PID: {_mem.ProcessId}");
-        r.Line($"Module base: {Log.Hex(_mem.ModuleBase)}");
-        r.Line($"Module size: {Log.Hex(_mem.ModuleSize)}");
+        BuildProbe.Header(_mem, target, r, "pointer diagnostic");
+        r.Line($"Reason: {reason}");
         r.Line($"FNamePool: {(_names.IsReady ? $"OK via '{_names.PoolMethod}', Blocks[] at {Log.Hex(_names.BlocksAddr)}" : "NOT READY (class names unavailable)")}");
         r.Line($"Catalog: {_catalog.All.Count(d => d.IsResolved)}/{_catalog.All.Count} segment names resolved");
         foreach (var d in _catalog.All.Where(d => !d.IsResolved))
@@ -356,6 +353,12 @@ public class PrismScanner
 
         try
         {
+            // Only worth the extra scans on a build whose code hasn't been confirmed.
+            if (target is { Tested: false })
+            {
+                BuildProbe.Signatures(_mem, r);
+                r.Line();
+            }
             var chain = WalkChain(r, deep: true);
             if (chain.Ok) DumpInventory(r, chain.Inventory);
             if (chain.Pawn != 0) DumpCharacterStats(r, chain.Pawn);
@@ -368,15 +371,10 @@ public class PrismScanner
 
         r.Line();
         r.Line($"Failed memory reads during diagnostic: {_mem.FailedReads - failedBefore}");
-
-        Directory.CreateDirectory(Log.LogDirectory);
-        string path = Path.Combine(Log.LogDirectory, $"Prismforge_Diag_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-        File.WriteAllText(path, r.ToString());
-        Log.Info($"Diagnostic written: {Path.GetFileName(path)} (Logs folder)");
-        return path;
+        return BuildProbe.Save(r, "chain");
     }
 
-    private void DumpInventory(DiagReport r, ulong inv)
+    private void DumpInventory(DiagReport r, ulong inv, bool prismsOnly = false)
     {
         r.Line();
         r.Line("=== Inventory ===");
@@ -394,7 +392,7 @@ public class PrismScanner
             string name = ItemClassName(bp);
             bool isPrism = IsPrismClass(name);
             if (isPrism) prisms++;
-            if (i < 60 || isPrism)
+            if ((i < 60 && !prismsOnly) || isPrism)
                 r.Line($"  [{i,4}] item={Log.Hex(item)} bp={Log.Hex(bp)} data={Log.Hex(data)} name='{name}'{(isPrism ? "  <-- PRISM" : "")}");
             if (isPrism && data != 0)
             {
@@ -410,7 +408,7 @@ public class PrismScanner
                     r.Line($"           fed[{f.Index}] {Log.Hex(f.Address)} id={f.RawNameId:X} '{_names.Resolve(f.RawNameId)}' → {f.Def.Name} Lv={f.Level}");
             }
         }
-        if (count > 60) r.Line($"  … {count - 60} more items (only prisms listed beyond #60)");
+        if (count > 60 && !prismsOnly) r.Line($"  … {count - 60} more items (only prisms listed beyond #60)");
         r.Line($"  Prism items: {prisms}");
     }
 
@@ -502,7 +500,9 @@ public class PrismScanner
         prism.Xp = prism.EditXp = prism.OriginalXp = _mem.ReadFloat(data + GameOffsets.Data_Xp);
 
         int segCount = _mem.ReadInt32(data + GameOffsets.Data_SegCount);
-        if (prism.SegmentsAddress != 0 && segCount is > 0 and <= 16)
+        int segMax = _mem.ReadInt32(data + GameOffsets.Data_SegMax);
+        prism.SegmentCapacity = segMax is >= 0 and <= MaxSegmentCapacity ? segMax : 0;
+        if (prism.SegmentsAddress != 0 && segCount > 0 && segCount <= prism.SegmentCapacity)
             for (int j = 0; j < segCount; j++)
             {
                 var s = new SegmentSlot { Index = j, Address = prism.SegmentsAddress + (ulong)j * GameOffsets.Seg_Stride };
@@ -512,7 +512,7 @@ public class PrismScanner
                 prism.Segments.Add(s);
             }
         else if (segCount != 0)
-            Log.Warn($"Prism '{prism.Name}': segments array looks invalid (Data={Log.Hex(prism.SegmentsAddress)}, Num={segCount}).");
+            Log.Warn($"Prism '{prism.Name}': segments array looks invalid (Data={Log.Hex(prism.SegmentsAddress)}, Num={segCount}, Max={segMax}).");
 
         int feedCount = _mem.ReadInt32(data + GameOffsets.Data_FeedCount);
         if (prism.FeedAddress != 0 && feedCount is > 0 and <= 128)
@@ -530,6 +530,13 @@ public class PrismScanner
         prism.Track();
         return prism;
     }
+
+    /// Sanity bound for CurrentSegments.Max. A normal prism tops out at 6; the game's growth slack
+    /// gave 25 in testing.
+    public const int MaxSegmentCapacity = 256;
+
+    /// Re-reads CurrentSegments.Max (it changes when the game reallocates the array).
+    public int ReadSegmentCapacity(PrismData p) => _mem.ReadInt32(p.DataAddress + GameOffsets.Data_SegMax);
 
     private void ReadSegment(SegmentSlot s)
     {

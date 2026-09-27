@@ -128,11 +128,19 @@ public sealed class LevelPips : FrameworkElement
 
     protected override void OnRender(DrawingContext dc)
     {
-        // Grow in steps of ten when a level exceeds the normal cap, keeping the same width.
-        int max = Math.Max(1, Max), top = Math.Max(Value, Live);
-        if (top > max) max = Math.Min(30, (top + 9) / 10 * 10);
-        double h = ActualHeight, step = ActualWidth / max, gap = max > 10 ? 1.5 : 3;
-        double tick = Math.Max(1.5, step - gap), slant = max > 10 ? 2 : 3;
+        int max = Math.Max(1, Max);
+        if (Math.Max(Value, Live) > max)
+        {
+            // Past the normal cap ticks stop being readable (fusions can go into the millions): show the number.
+            var text = new FormattedText($"LV {Value:N0}", System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight, new Typeface("Segoe UI Semibold"), 11,
+                Value == Live ? Filled : Value > Live ? Pending : Removed,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            dc.DrawText(text, new Point(0, (ActualHeight - text.Height) / 2));
+            return;
+        }
+        double h = ActualHeight, step = ActualWidth / max, gap = 3;
+        double tick = Math.Max(1.5, step - gap), slant = 3;
         for (int i = 0; i < max; i++)
         {
             bool inValue = i < Value, inLive = i < Live;

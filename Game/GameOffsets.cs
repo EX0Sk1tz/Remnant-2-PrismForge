@@ -45,6 +45,7 @@ public static class GameOffsets
     public const ulong Data_Level        = 0x28;   // internal level (int32)
     public const ulong Data_SegPtr       = 0x58;   // CurrentSegments TArray.Data
     public const ulong Data_SegCount     = 0x60;
+    public const ulong Data_SegMax       = 0x64;   // allocated capacity; spare slots exist after the game grew the array
     public const ulong Data_FeedPtr      = 0x70;   // CurrentFeedData ("Roll Chances" in the CT)
     public const ulong Data_FeedCount    = 0x78;
     public const ulong Data_Xp           = 0x84;   // PendingExperience (float)
@@ -52,6 +53,7 @@ public static class GameOffsets
     // ── Segment (CurrentSegments element) ────────────────────────
     public const ulong Seg_RowName       = 0x00;   // FName (ComparisonIndex, Number)
     public const ulong Seg_Level         = 0x08;   // int32
+    public const ulong Seg_Action        = 0x0C;   // -1, or an action handle for action legendaries
     public const ulong Seg_Object        = 0x20;   // cached UObject* for the row (may be null)
     public const ulong Seg_Stride        = 0x28;
 

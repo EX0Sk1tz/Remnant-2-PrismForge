@@ -23,14 +23,13 @@ public enum Tone { Neutral, Good, Warn, Bad }
 /// </summary>
 public partial class MainViewModel : ObservableObject
 {
-    private const string ProcessName = "Remnant2-Win64-Shipping";
-    private const string GamePassText = "The Game Pass version of Remnant 2 isn't supported yet. This editor is tested on the Steam version.";
-
     private readonly SegmentCatalog _catalog = SegmentCatalog.Load();
+    private GameTarget? _target;
     private ProcessMemory? _mem;
     private FNameReader? _names;
     private PrismScanner? _scanner;
     private PrismWriter? _writer;
+    private GameAllocator? _allocator;
 
     private readonly DispatcherTimer _timer;
     private bool _tickRunning;
@@ -41,6 +40,9 @@ public partial class MainViewModel : ObservableObject
     private readonly Dictionary<ulong, Snapshot> _session = new();
 
     private sealed record Snapshot(float Xp, (SegmentDef Def, int Level)[] Segments, (SegmentDef Def, int Level)[] Feeds);
+
+    /// "Make room" undo data per prism (key: prism data address), kept until the game reallocates.
+    private readonly Dictionary<ulong, RoomBackup> _roomBackups = new();
 
     /// Set by the --diagnose command-line switch: write a diagnostic report after the first scan.
     public static bool DiagnoseOnFirstScan { get; set; }
@@ -198,20 +200,15 @@ public partial class MainViewModel : ObservableObject
 
     private async Task TryAttachAsync()
     {
-        if (Process.GetProcessesByName(ProcessName).Length == 0)
+        var target = GameBuild.FindRunning();
+        if (target == null)
         {
             Link = LinkState.Searching;
             LinkText = "Looking for Remnant 2";
             LinkDetail = "";
-            // Game Pass / Microsoft Store build: different executable, untested offsets.
-            if (Process.GetProcessesByName("Remnant2-WinGDK-Shipping").Length > 0)
-            {
-                Link = LinkState.Error;
-                LinkText = "Unsupported version";
-                if (Status != GamePassText) SetStatus(GamePassText, Tone.Warn);
-            }
             return;
         }
+        if (target != _target) OnTargetFound(target);
 
         Link = LinkState.Loading;
         LinkText = "Attaching";
@@ -219,16 +216,32 @@ public partial class MainViewModel : ObservableObject
         var mem = new ProcessMemory();
         var names = new FNameReader(mem);
         int resolved = 0;
+        string? report = null;
+        int attempt = ++_attachFailures;
 
         await Task.Run(() =>
         {
             try
             {
-                mem.Attach(ProcessName);
-                if (!names.FindPool()) error = "The game is still starting up.";
+                mem.Attach(target.ProcessName, target.ModuleName);
+                if (!names.FindPool())
+                {
+                    error = "The game is still starting up.";
+                    // Still failing well after start-up: record the build and every signature once,
+                    // since without the name table no other diagnostic can run.
+                    if (attempt == AttachReportAfter && !_attachReportWritten)
+                    {
+                        _attachReportWritten = true;
+                        report = BuildProbe.WriteAttachReport(mem, target, $"FNamePool not found after {attempt} attempts");
+                    }
+                }
                 else resolved = _catalog.ResolveIds(names);
             }
-            catch (Exception ex) { error = ex.Message; }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                Log.Debug($"Attach attempt {attempt} failed: {ex}");
+            }
         });
 
         if (error != null)
@@ -236,38 +249,88 @@ public partial class MainViewModel : ObservableObject
             mem.Dispose();
             Link = LinkState.Loading;
             LinkText = "Waiting for the game";
-            SetStatus(error, Tone.Warn);
+            if (report != null)
+                SetStatus($"{error} A report was written to the logs folder ({System.IO.Path.GetFileName(report)}).", Tone.Warn);
+            else if (Status != error) SetStatus(error, Tone.Warn);
+            else Log.Debug($"Attach attempt {attempt}: {error}");
             return;
         }
 
+        _attachFailures = 0;
         _mem = mem;
         _names = names;
         _scanner = new PrismScanner(mem, names, _catalog);
         _writer = new PrismWriter(mem, _scanner);
+        var allocator = _allocator = new GameAllocator(mem);
+        _writer.Allocator = allocator;
+        _ = Task.Run(() =>
+        {
+            try { if (allocator.Find()) _forceScan = true; }   // rescan so Add segment enables
+            catch (Exception ex) { Log.Error("Looking for the game's allocator failed.", ex); }
+        });
         _forceScan = true;
         IsLinked = true;
+        OnPropertyChanged(nameof(IsReadOnly));
+        ApplyCommand.NotifyCanExecuteChanged();
         Link = LinkState.Linked;
         LinkText = "Linked";
-        LinkDetail = $"PID {mem.ProcessId}";
+        LinkDetail = target.Tested ? $"PID {mem.ProcessId}" : $"PID {mem.ProcessId} · {target.Store}{(IsReadOnly ? " · read-only" : "")}";
         Log.Info($"Resolved {resolved}/{_catalog.All.Count} segment names.");
+        _nameRetries = 0;
         OnPropertyChanged(nameof(ResolvedStats));
         RebuildChoices();
-        SetStatus("Connected to Remnant 2. Reading your prisms…", Tone.Good);
+        if (target.Tested) SetStatus("Connected to Remnant 2. Reading your prisms…", Tone.Good);
+        else SetStatus($"Connected to the {target.Store} version (untested). " +
+                       (IsReadOnly ? "Read-only: Apply and Hold are off. " : "Writes are enabled. ") +
+                       "Diagnostics go to the logs folder.", Tone.Warn);
         await InitStatsAsync(mem, names);
+    }
+
+    /// Attach failures in a row before the build report is written (about 20 s of a running game).
+    private const int AttachReportAfter = 10;
+    /// Scan failures in a row on an untested build before a chain report is written (~30 s).
+    private const int ChainReportAfter = 15;
+
+    private int _attachFailures, _scanFailures;
+    private bool _attachReportWritten, _chainReportWritten, _untestedNoticed;
+
+    /// Apply and Hold are refused on an untested build unless --allow-untested-writes was given.
+    public bool IsReadOnly => _target is { Tested: false } && !GameBuild.AllowUntestedWrites;
+
+    private void OnTargetFound(GameTarget target)
+    {
+        _target = target;
+        _attachFailures = 0;
+        _attachReportWritten = _chainReportWritten = false;
+        Log.Info($"Game process found: {target.ModuleName} ({target.Store}, {(target.Tested ? "tested" : "untested")}).");
+        if (target.Tested || _untestedNoticed) return;
+
+        _untestedNoticed = true;
+        Log.RaiseDetail(LogLevel.Debug, $"{target.Store} build is untested");
+        Log.Warn($"The {target.Store} build is untested. " + (GameBuild.AllowUntestedWrites
+            ? "--allow-untested-writes is set: Apply and Hold WILL write to the game."
+            : "Running read-only. Start with --allow-untested-writes to enable Apply and Hold."));
+        DiagnoseOnFirstScan = true;
     }
 
     private void Disconnect(string reason)
     {
+        if (_mem != null) Log.Info($"Disconnecting. {_mem.FailedReads} failed memory reads during this connection.");
         _mem?.Dispose();
         _mem = null;
         _names = null;
         _scanner = null;
         _writer = null;
+        _allocator = null;
+        _target = null;   // a restarted game gets its own attach/chain reports
+        _scanFailures = 0;
+        OnPropertyChanged(nameof(IsReadOnly));
         IsLinked = false;
         IsInSync = false;
         Prisms.Clear();
         SelectedPrism = null;
         _session.Clear();
+        _roomBackups.Clear();
         _objectsIndexed = false;
         ResetStats();
         Link = LinkState.Searching;
@@ -305,13 +368,29 @@ public partial class MainViewModel : ObservableObject
         _forceScan = false;
         if (found == null)
         {
-            if (IsInSync || Prisms.Count == 0) SetStatus(failure!, Tone.Warn);
+            _scanFailures++;
+            Log.Debug($"Scan failed ({_scanFailures} in a row, {_mem?.FailedReads} failed reads since attach): {failure}");
+            if (Status != failure && (IsInSync || Prisms.Count == 0)) SetStatus(failure!, Tone.Warn);
             IsInSync = false;
             Link = LinkState.Loading;
             LinkText = "Waiting for character";
+            // On an untested build a chain that never resolves is the interesting case: capture it.
+            if (_target is { Tested: false } && _scanFailures == ChainReportAfter && !_chainReportWritten)
+            {
+                _chainReportWritten = true;
+                var scanner = _scanner;
+                var target = _target;
+                string why = $"pointer chain failed {_scanFailures} times in a row: {failure}";
+                _ = Task.Run(() =>
+                {
+                    try { scanner.RunDiagnostic(target, why); }
+                    catch (Exception ex) { Log.Error("Automatic diagnostic failed.", ex); }
+                });
+            }
             return;
         }
 
+        _scanFailures = 0;
         MergeScan(found);
         IsInSync = true;
         if (!_objectsIndexed)
@@ -328,8 +407,9 @@ public partial class MainViewModel : ObservableObject
         if (DiagnoseOnFirstScan)
         {
             DiagnoseOnFirstScan = false;
-            string path = await Task.Run(() => _scanner.RunDiagnostic());
-            Log.Info($"--diagnose: report {System.IO.Path.GetFileName(path)} written to the Logs folder.");
+            var target = _target;
+            string path = await Task.Run(() => _scanner.RunDiagnostic(target, "first successful scan"));
+            Log.Info($"First-scan diagnostic {System.IO.Path.GetFileName(path)} written to the Logs folder.");
         }
         Link = LinkState.Linked;
         LinkText = "Linked";
@@ -339,6 +419,59 @@ public partial class MainViewModel : ObservableObject
             1 => "1 prism found.",
             _ => $"{found.Count} prisms found.",
         }, found.Count > 0 ? Tone.Good : Tone.Neutral);
+        HandleRoomBackups();
+        RetryNameResolution();
+    }
+
+    /// After "Make room": once the game has reallocated a prism's segment array (new legendary
+    /// picked), puts the extra segments that were taken off back into the new spare room.
+    private void HandleRoomBackups()
+    {
+        if (_writer == null) return;
+        foreach (var p in Prisms.ToList())
+        {
+            if (!_roomBackups.TryGetValue(p.DataAddress, out var b) || p.HasRoomBackup) continue;
+            _roomBackups.Remove(p.DataAddress);
+
+            if (p.SegmentsAddress == b.SegmentsAddress)
+            {
+                Log.Warn($"'{p.Name}': the segment count changed without a new array; Make room was abandoned. Removed entries are in the log.");
+                continue;
+            }
+            if (b.Extras == 0)
+            {
+                SetStatus($"New array for '{p.Name}'. Add segment has room now.", Tone.Good);
+                continue;
+            }
+            var (r, n) = _writer.PutBackSegments(p, b);
+            _forceScan = true;
+            if (r.Ok)
+                SetStatus($"New array for '{p.Name}': {n} segment(s) put back. Add segment has room now."
+                          + (r.Notes.Count > 0 ? " " + r.Notes[0] : ""), r.Notes.Count > 0 ? Tone.Warn : Tone.Good);
+            else
+                SetStatus(r.Problems[0] + " The removed segments are in the log.", Tone.Bad);
+        }
+    }
+
+    private int _nameRetries;
+    private DateTime _nextNameRetry;
+
+    /// Attaching while the game is still loading can resolve only some (or none) of the segment
+    /// names, which leaves the stat pickers empty. Retries every 5 s for a few minutes.
+    private void RetryNameResolution()
+    {
+        if (_names == null || ResolvedStats == TotalStats || _nameRetries >= 60 || DateTime.UtcNow < _nextNameRetry) return;
+        _nameRetries++;
+        _nextNameRetry = DateTime.UtcNow.AddSeconds(5);
+
+        int before = ResolvedStats;
+        int now = _catalog.ResolveIds(_names);
+        if (now == before) return;
+        Log.Info($"Resolved {now}/{TotalStats} segment names (was {before}).");
+        OnPropertyChanged(nameof(ResolvedStats));
+        RebuildChoices();
+        _objectsIndexed = false;   // ResolveIds cleared the cached class objects
+        _forceScan = true;         // re-read segments with the resolved names
     }
 
     /// Replaces the prism list, carrying over staged edits and session snapshots.
@@ -362,8 +495,15 @@ public partial class MainViewModel : ObservableObject
 
     private void ApplySnapshot(PrismData p)
     {
+        p.CanGrow = _allocator?.IsAvailable == true;
+        // Waiting for the new legendary pick (see HandleRoomBackups for what happens after it).
+        if (_roomBackups.TryGetValue(p.DataAddress, out var room))
+            p.HasRoomBackup = room.SegmentsAddress == p.SegmentsAddress && room.Keep == p.Segments.Count;
+
+        // Segments appended after session start (by the game or the editor) keep their current
+        // values as the original, so Revert leaves them alone.
         if (_session.TryGetValue(p.DataAddress, out var snap)
-            && snap.Segments.Length == p.Segments.Count && snap.Feeds.Length == p.Feeds.Count)
+            && snap.Segments.Length <= p.Segments.Count && snap.Feeds.Length == p.Feeds.Count)
         {
             p.OriginalXp = snap.Xp;
             for (int i = 0; i < snap.Segments.Length; i++)
@@ -422,13 +562,16 @@ public partial class MainViewModel : ObservableObject
         await TickAsync();
     }
 
-    private bool CanApply() => IsLinked && IsInSync && HasChanges;
+    private bool CanApply() => IsLinked && IsInSync && HasChanges && !IsReadOnly;
 
     [RelayCommand(CanExecute = nameof(CanApply))]
     private void Apply()
     {
-        if (_writer == null) return;
+        if (_writer == null || IsReadOnly) return;
         var dirty = Prisms.Where(p => p.IsDirty).ToList();
+        // The game applies segment bonuses when the prism is equipped, so new ones need a re-equip.
+        bool segmentsChanged = dirty.Any(p => p.Segments.Any(s => s.IsDirty));
+        const string reequip = " Re-equip the prism in game so the new segment bonuses take effect.";
         int writes = 0;
         var problems = new List<string>();
         var notes = new List<string>();
@@ -443,7 +586,8 @@ public partial class MainViewModel : ObservableObject
         if (problems.Count == 0 && notes.Count > 0)
             SetStatus($"Applied {writes} value{(writes == 1 ? "" : "s")}. " + notes[0], Tone.Warn);
         else if (problems.Count == 0)
-            SetStatus($"Applied. {writes} value{(writes == 1 ? "" : "s")} written and confirmed in game memory.", Tone.Good);
+            SetStatus($"Applied. {writes} value{(writes == 1 ? "" : "s")} written and confirmed in game memory."
+                      + (segmentsChanged ? reequip : ""), Tone.Good);
         else
         {
             SetStatus(problems[0] + (problems.Count > 1 ? $" (+{problems.Count - 1} more, see journal)" : ""), Tone.Bad);
@@ -477,7 +621,10 @@ public partial class MainViewModel : ObservableObject
         if (SelectedPrism == null) return;
         foreach (var s in SelectedPrism.Segments.Where(s => s.EditDef.Kind != SegmentKind.Legendary))
             s.EditLevel = SegmentTarget;
-        SetStatus($"Segments staged at level {SegmentTarget}. Legendary left unchanged.");
+        SetStatus($"Segments staged at level {SegmentTarget:N0}. Legendary left unchanged."
+                  + (SegmentTarget > SegmentSlot.NormalMaxLevel
+                      ? $" Standard segments stop gaining at {SegmentSlot.NormalMaxLevel}; fusions keep scaling."
+                      : ""));
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
@@ -503,6 +650,169 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ResetSlot(SlotBase? slot) => slot?.Discard();
 
+    /// Experimental: appends a segment into the spare capacity the game left in the array.
+    [RelayCommand]
+    private async Task AddSegmentAsync()
+    {
+        var p = SelectedPrism;
+        if (!CanChangeSegmentCount(p)) return;
+
+        // A fusion the prism doesn't have yet (loaded classes first, so the effect starts right away).
+        var present = p!.Segments.Select(s => s.Def).ToHashSet();
+        var def = _catalog.All.Where(d => d.IsResolved && d.Kind == SegmentKind.Fusion && !present.Contains(d))
+                      .OrderByDescending(d => d.DefaultObject != 0).FirstOrDefault()
+                  ?? _catalog.All.FirstOrDefault(d => d.IsResolved && d.Kind == SegmentKind.Standard && !present.Contains(d));
+        if (def == null)
+        {
+            SetStatus("No segment stat left to add.", Tone.Warn);
+            return;
+        }
+
+        int number = p.Segments.Count + 1;
+        var r = _writer!.AddSegment(p, def, SegmentSlot.NormalMaxLevel);
+        _forceScan = true;
+        if (!r.Ok)
+        {
+            SetStatus(r.Problems[0], Tone.Bad);
+            return;
+        }
+        await TickAsync();
+        SetStatus($"Segment {number} added ({def.Name}, Lv {SegmentSlot.NormalMaxLevel}). Change its stat and level like any other segment, "
+                  + "then re-equip the prism in game." + (r.Notes.Count > 0 ? " " + string.Join(" ", r.Notes) : ""),
+                  r.Notes.Count > 0 ? Tone.Warn : Tone.Good);
+    }
+
+    /// Removes any segment, wherever it came from. Its slot becomes spare room for Add segment.
+    [RelayCommand]
+    private Task RemoveSegmentAsync(SegmentSlot? slot) =>
+        RunArrayEdit(slot, p => _writer!.RemoveSegment(p, slot!.Index),
+                     $"Segment {slot?.Number} ({slot?.Def.Name}) removed. Re-equip the prism in game.");
+
+    [RelayCommand]
+    private Task MoveSegmentUpAsync(SegmentSlot? slot) =>
+        RunArrayEdit(slot, p => _writer!.MoveSegment(p, slot!.Index, -1), $"Segment {slot?.Number} moved up.");
+
+    [RelayCommand]
+    private Task MoveSegmentDownAsync(SegmentSlot? slot) =>
+        RunArrayEdit(slot, p => _writer!.MoveSegment(p, slot!.Index, +1), $"Segment {slot?.Number} moved down.");
+
+    [RelayCommand]
+    private Task RemoveFeedAsync(FeedSlot? slot) =>
+        RunArrayEdit(slot, p => _writer!.RemoveFeed(p, slot!.Index), $"Fed fragment {slot?.Number} ({slot?.Def.Name}) removed.");
+
+    /// Empties the selected prism: no segments, no fed fragments, no XP, internal level 0.
+    [RelayCommand]
+    private async Task ResetPrismAsync()
+    {
+        var p = SelectedPrism;
+        if (!CanEditArrays(p)) return;
+        var answer = MessageBox.Show(
+            $"Reset {p!.Name} {p.Numeral} to a blank prism?\n\n" +
+            $"All {p.Segments.Count} segment(s) and {p.Feeds.Count} fed fragment(s) are removed, and XP and level go to 0. " +
+            "The game saves this with your character. The old entries are written to the log, but Prismforge can't put them back.",
+            "Reset prism", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
+        if (answer != MessageBoxResult.OK) return;
+
+        var r = _writer!.ResetPrism(p);
+        _forceScan = true;
+        if (!r.Ok)
+        {
+            SetStatus(r.Problems[0], Tone.Bad);
+            return;
+        }
+        await TickAsync();
+        SetStatus("Prism reset. Unequip and re-equip it in game." + (r.Notes.Count > 0 ? " " + r.Notes[0] : ""),
+                  r.Notes.Count > 0 ? Tone.Warn : Tone.Good);
+    }
+
+    /// Shared flow of the remove/move commands: checks, write, rescan, status.
+    private async Task RunArrayEdit(SlotBase? slot, Func<PrismData, CommitResult> edit, string done)
+    {
+        var p = SelectedPrism;
+        if (slot == null || !CanEditArrays(p)) return;
+        var r = edit(p!);
+        _forceScan = true;
+        if (!r.Ok)
+        {
+            SetStatus(r.Problems[0], Tone.Bad);
+            return;
+        }
+        await TickAsync();
+        SetStatus(done + (r.Notes.Count > 0 ? " " + r.Notes[0] : ""), r.Notes.Count > 0 ? Tone.Warn : Tone.Good);
+    }
+
+    private bool CanEditArrays(PrismData? p)
+    {
+        if (!CanChangeSegmentCount(p)) return false;
+        if (p!.HasRoomBackup)
+        {
+            SetStatus("Finish Make room first (pick the legendary in game) or press Restore legendary.", Tone.Warn);
+            return false;
+        }
+        return true;
+    }
+
+    /// Experimental: takes the legendary off the list and marks the array full, so the game
+    /// reallocates it with spare room when the legendary is picked again.
+    [RelayCommand]
+    private async Task MakeRoomAsync()
+    {
+        var p = SelectedPrism;
+        if (!CanChangeSegmentCount(p)) return;
+
+        var (r, backup) = _writer!.MakeRoom(p!);
+        _forceScan = true;
+        if (!r.Ok || backup == null)
+        {
+            SetStatus(r.Problems.FirstOrDefault() ?? "Making room failed.", Tone.Bad);
+            return;
+        }
+        _roomBackups[p!.DataAddress] = backup;
+        await TickAsync();
+        SetStatus((backup.Extras > 0 ? $"Legendary and {backup.Extras} extra segment(s) taken off the list. " : "Legendary taken off the list. ")
+                  + "Give the prism XP (Pending XP, Apply) and pick the legendary again in game; the editor then puts the extra segments back "
+                  + "and Add segment is available. Keep Prismforge open until then. Restore legendary undoes this.", Tone.Warn);
+    }
+
+    [RelayCommand]
+    private async Task RestoreRoomAsync()
+    {
+        var p = SelectedPrism;
+        if (!CanChangeSegmentCount(p)) return;
+        if (!_roomBackups.TryGetValue(p!.DataAddress, out var backup))
+        {
+            SetStatus("Nothing to restore.", Tone.Warn);
+            return;
+        }
+
+        var r = _writer!.RestoreRoom(p, backup);
+        _forceScan = true;
+        _roomBackups.Remove(p.DataAddress);
+        if (!r.Ok)
+        {
+            SetStatus(r.Problems[0], Tone.Bad);
+            return;
+        }
+        await TickAsync();
+        SetStatus("Legendary restored.", Tone.Good);
+    }
+
+    private bool CanChangeSegmentCount(PrismData? p)
+    {
+        if (p == null || _writer == null || !IsInSync) return false;
+        if (IsReadOnly)
+        {
+            SetStatus("Read-only on this untested game version. Start Prismforge with --allow-untested-writes to change segments.", Tone.Warn);
+            return false;
+        }
+        if (p.IsDirty)
+        {
+            SetStatus("Apply or discard this prism's pending changes first.", Tone.Warn);
+            return false;
+        }
+        return true;
+    }
+
     [RelayCommand(CanExecute = nameof(IsLinked))]
     private async Task DiagnosticAsync()
     {
@@ -510,7 +820,8 @@ public partial class MainViewModel : ObservableObject
         SetStatus("Running diagnostic…");
         try
         {
-            string path = await Task.Run(() => _scanner.RunDiagnostic());
+            var target = _target;
+            string path = await Task.Run(() => _scanner.RunDiagnostic(target));
             SetStatus("Diagnostic saved to the logs folder.", Tone.Good);
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }

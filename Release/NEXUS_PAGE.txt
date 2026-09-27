@@ -3,7 +3,7 @@ Mod title:
 Prismforge - Live Prism & Stat Editor for Remnant II
 
 Summary line (short description field):
-Edit prisms and character attributes in Remnant II while the game runs. Change segment stats and levels, hold any stat past its normal limit. Steam version.
+Edit prisms and character attributes in Remnant II while the game runs. Change segment stats and levels, add extra segments, hold any stat past its normal limit. Steam and Game Pass.
 
 --- Description (paste into the description editor, BBCode mode) ---
 
@@ -12,13 +12,28 @@ Edit prisms and character attributes in Remnant II while the game runs. Change s
 
 Edit your [b]prisms[/b] and [b]character attributes[/b] while Remnant II is running. Change a value, press Apply, and it is live in game. No save-file swapping.
 
-[b][color=#e07b3c]Tested on the Steam version.[/color][/b] Game Pass is not supported yet.
+[b][color=#e07b3c]Tested on the Steam and Game Pass versions.[/color][/b]
+
+[size=4][b]New in 2.1.0[/b][/size]
+[list]
+[*][b]Add segment any time[/b]: a full prism gets more room from the game's own memory allocator, no workaround needed
+[*][b]Remove or reorder any segment[/b], and remove fed fragments
+[*][b]Reset prism[/b]: turn a prism back into a blank one and build it up again from level 0
+[/list]
+
+[size=4][b]New in 2.0.0[/b][/size]
+[list]
+[*][b]Segment levels up to 100,000,000[/b]: fusion bonuses keep scaling with level, standard segments stop at level 10
+[*][b]Game Pass / Microsoft Store version supported[/b]
+[*][b]Support zip[/b] for bug reports, safer attribute writes
+[/list]
 
 [size=4][b]Features[/b][/size]
 [list]
 [*][b]All prisms on your character[/b] with name, level, segments and fed fragments
 [*][b]Change any segment[/b]: 45 standard stats, 23 fusions, 42 legendaries, with in-game names and descriptions
-[*][b]Change segment levels and pending XP[/b]
+[*][b]Change segment levels and pending XP[/b]; fusion bonuses scale with level
+[*][b]Extra segments[/b] beyond the usual six, remove and reorder segments, reset a prism (experimental)
 [*]Edits are staged and only written on [b]Apply[/b]; every write is read back and confirmed
 [*][b]Discard[/b] and [b]Revert to session start[/b] to undo
 [*][b]Attributes[/b]: live list of ~220 character stats (damage, crit, weak spot, speeds, resistances, caps)
@@ -27,7 +42,7 @@ Edit your [b]prisms[/b] and [b]character attributes[/b] while Remnant II is runn
 [*]Connects to the game by itself, no admin rights, single self-contained exe
 [/list]
 
-[b]Note:[/b] segment levels above 10 do not raise a prism bonus, the game stops at 10. Use Attributes to go past normal limits.
+[b]Note:[/b] above level 10 only fusion bonuses keep growing; standard segments stay at their level-10 value. Re-equip the prism after Apply, the game applies bonuses on equip.
 
 [size=4][b]Installation[/b][/size]
 [list=1]
@@ -53,13 +68,13 @@ The editor reads and writes the game's memory and, for Hold, patches one instruc
 
 [size=4][b]Known limitations[/b][/size]
 [list]
-[*]Game Pass / Microsoft Store version not supported
-[*]Fed-fragment editing untested on prisms that have fed fragments
+[*]Fed-fragment editing untested
+[*]Extreme fusion levels can break the game (e.g. cooldowns below zero) and are saved with your character
 [*]Replacing an action-based legendary (e.g. Unbreakable) may keep the old effect until reload
 [/list]
 
 [size=4][b]Bug reports[/b][/size]
-Press [b]Diagnostic[/b] in the editor's bottom bar and attach the report from [b]Logs[/b], plus what you did.
+Press [b]Support zip[/b] in the editor's bottom bar and attach the zip, plus what you did.
 
 [size=4][b]Credits[/b][/size]
 [list]

@@ -48,9 +48,15 @@ public sealed class CharacterStats
         return rows;
     }
 
-    public bool WriteValue(ulong rowAddress, float value, bool quiet)
-        => quiet ? _mem.WriteQuiet(rowAddress + Row_Value, BitConverter.GetBytes(value))
-                 : _mem.WriteFloat(rowAddress + Row_Value, value);
+    /// Writes a stat value only if the row still holds <paramref name="nameId"/>. The game inserts and
+    /// removes rows at runtime (seen on Game Pass: 209 → 212 rows, entries shifted), so an address
+    /// from the last read can belong to a different stat by the time we write.
+    public bool WriteValue(ulong rowAddress, int nameId, float value, bool quiet)
+    {
+        if (rowAddress == 0 || _mem.ReadInt32(rowAddress) != nameId) return false;
+        return quiet ? _mem.WriteQuiet(rowAddress + Row_Value, BitConverter.GetBytes(value))
+                     : _mem.WriteFloat(rowAddress + Row_Value, value);
+    }
 
     /// Rough grouping for the filter chips.
     public static string Category(string n)

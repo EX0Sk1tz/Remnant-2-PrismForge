@@ -7,14 +7,33 @@ namespace R2PrismRuntime;
 
 public partial class App : Application
 {
+    // One Prismforge per Windows session: two instances attached to the same game would overwrite each
+    // other's prism writes and held stats, and could both try to patch the stat hook site.
+    private const string InstanceMutexName = @"Local\Prismforge.SingleInstance";
+    private static Mutex? _instanceMutex;
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        // The UI self-test is meant to run next to a normal instance (it leaves the stat hook alone), so it skips the guard.
+        bool selfTest = e.Args.Contains("--selftest-ui", StringComparer.OrdinalIgnoreCase);
+        bool createdNew = true;
+        if (!selfTest) _instanceMutex = new Mutex(initiallyOwned: true, InstanceMutexName, out createdNew);
+        if (!createdNew && _instanceMutex != null)
+        {
+            _instanceMutex.Dispose();
+            _instanceMutex = null;
+            MessageBox.Show("Prismforge is already running. Close the other window first, so the two don't overwrite each other's changes in the game.",
+                "Prismforge", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown(1);
+            return;
+        }
+
         if (e.Args.Contains("--verbose", StringComparer.OrdinalIgnoreCase)) Log.MinLevel = LogLevel.Debug;
         Log.Init();
         Resources["Grain"] = CreateGrain();
         UI.MainViewModel.DiagnoseOnFirstScan = e.Args.Contains("--diagnose", StringComparer.OrdinalIgnoreCase);
-        UI.MainViewModel.SelfTest = e.Args.Contains("--selftest-ui", StringComparer.OrdinalIgnoreCase);
-        base.OnStartup(e);
+        UI.MainViewModel.SelfTest = selfTest;
+        Game.GameBuild.AllowUntestedWrites = e.Args.Contains("--allow-untested-writes", StringComparer.OrdinalIgnoreCase);        base.OnStartup(e);
 
         DispatcherUnhandledException += (_, a) =>
         {
@@ -36,6 +55,11 @@ public partial class App : Application
     {
         Log.Info($"App exiting (code {e.ApplicationExitCode}).");
         Log.Shutdown();
+        if (_instanceMutex != null)
+        {
+            _instanceMutex.ReleaseMutex();
+            _instanceMutex.Dispose();
+        }
         base.OnExit(e);
     }
 

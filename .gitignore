@@ -4,8 +4,12 @@ obj/
 publish/
 logs/
 
+# Testers' logs and support zips (contain local paths)
+GamePassTestFiles/
+
 # Release packages (uploaded to Nexus / GitHub Releases, not committed)
 Release/*.zip
+Release/*/
 
 # IDE state
 .vs/

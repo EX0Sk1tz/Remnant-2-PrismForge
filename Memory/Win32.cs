@@ -57,6 +57,22 @@ internal static class Win32
     [DllImport("kernel32.dll")]
     public static extern bool FlushInstructionCache(IntPtr hProcess, ulong address, UIntPtr size);
 
+    public const uint PROCESS_CREATE_THREAD = 0x0002;
+    public const uint WAIT_OBJECT_0 = 0;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr CreateRemoteThread(IntPtr hProcess, IntPtr attributes, UIntPtr stackSize,
+        ulong startAddress, ulong parameter, uint creationFlags, out uint threadId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GetExitCodeThread(IntPtr hThread, out uint exitCode);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern bool QueryFullProcessImageName(IntPtr hProcess, uint flags, System.Text.StringBuilder exeName, ref int size);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct MEMORY_BASIC_INFORMATION
     {

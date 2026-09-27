@@ -26,11 +26,11 @@ public sealed class StatHook
     private const int CaveSize = 0x1000;
     private const int TableCount = 0x10, TableEntries = 0x18, CodeOffset = 0x800;
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("R2PEHOOK");
-    private static readonly byte[] Original = { 0x41, 0x89, 0x44, 0x24, 0x08 };   // mov [r12+08],eax
+    internal static readonly byte[] Original = { 0x41, 0x89, 0x44, 0x24, 0x08 };   // mov [r12+08],eax
 
     // CT: aobscanmodule(MoveSpeedCap, 09 04 93 48 63 C6 48 8D 0C 80), hook at +0x26
-    private static readonly byte[] Aob = { 0x09, 0x04, 0x93, 0x48, 0x63, 0xC6, 0x48, 0x8D, 0x0C, 0x80 };
-    private const ulong SiteOffset = 0x26;
+    internal static readonly byte[] Aob = { 0x09, 0x04, 0x93, 0x48, 0x63, 0xC6, 0x48, 0x8D, 0x0C, 0x80 };
+    internal const ulong SiteOffset = 0x26;
 
     private readonly ProcessMemory _mem;
     private ulong _site, _cave;

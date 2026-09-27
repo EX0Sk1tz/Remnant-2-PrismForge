@@ -23,6 +23,23 @@ public static class AppInfo
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Prismforge");
 
     public static string LogDirectory => Path.Combine(DataDirectory, "logs");
+
+    public static bool IsElevated { get; } = CheckElevated();
+
+    private static bool CheckElevated()
+    {
+        try
+        {
+            using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+            return new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        }
+        catch { return false; }
+    }
+
+    /// One line describing the machine and this process, for logs and diagnostic reports.
+    public static string EnvironmentLine()
+        => $".NET {Environment.Version}, {System.Runtime.InteropServices.RuntimeInformation.OSDescription}, " +
+           $"64-bit process: {Environment.Is64BitProcess}, admin: {IsElevated}, culture: {System.Globalization.CultureInfo.CurrentCulture.Name}";
     private static string SettingsPath => Path.Combine(DataDirectory, "settings.json");
 
     public sealed record Credit(string Who, string What);

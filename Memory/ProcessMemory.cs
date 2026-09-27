@@ -25,9 +25,22 @@ public class ProcessMemory : IDisposable
 
     // ── Attach ────────────────────────────────────────────────────
 
-    public void Attach(string processName)
+    // Build fingerprint, filled on attach. Lets two testers' logs be compared at a glance.
+    public string ModulePath    { get; private set; } = "";
+    public string FileVersion   { get; private set; } = "";
+    public uint   PeTimestamp   { get; private set; }
+    public uint   PeSizeOfImage { get; private set; }
+
+    public string Fingerprint
+        => $"file version '{FileVersion}', PE timestamp 0x{PeTimestamp:X8}" +
+           (PeTimestamp != 0 ? $" ({DateTimeOffset.FromUnixTimeSeconds(PeTimestamp):yyyy-MM-dd HH:mm} UTC)" : "") +
+           $", SizeOfImage 0x{PeSizeOfImage:X}, module size 0x{ModuleSize:X}";
+
+    public void Attach(string processName, string moduleName)
     {
         Detach();
+        ModulePath = FileVersion = "";
+        PeTimestamp = PeSizeOfImage = 0;
         var procs = Process.GetProcessesByName(processName);
         Log.Info($"Found {procs.Length} process(es) named '{processName}'.");
         if (procs.Length == 0)
@@ -39,8 +52,10 @@ public class ProcessMemory : IDisposable
 
         var proc = procs[0];
         ProcessId = proc.Id;
+        // CREATE_THREAD: GameAllocator runs a short stub in the game to call its allocator.
         const uint access = Win32.PROCESS_VM_READ | Win32.PROCESS_VM_WRITE
-                          | Win32.PROCESS_VM_OPERATION | Win32.PROCESS_QUERY_INFORMATION;
+                          | Win32.PROCESS_VM_OPERATION | Win32.PROCESS_QUERY_INFORMATION
+                          | Win32.PROCESS_CREATE_THREAD;
         _handle = Win32.OpenProcess(access, false, proc.Id);
         if (_handle == IntPtr.Zero)
         {
@@ -51,32 +66,69 @@ public class ProcessMemory : IDisposable
         }
         Log.Info($"OpenProcess OK. PID {proc.Id}, handle {Log.Hex((ulong)_handle)}.");
 
+        ModulePath = QueryImagePath(_handle);
+        Log.Info($"Image path: '{ModulePath}'.");
+
         // Find the main module base and size
+        int moduleCount = 0;
         try
         {
             foreach (ProcessModule mod in proc.Modules)
             {
-                if (mod.ModuleName!.Equals("Remnant2-Win64-Shipping.exe",
-                        StringComparison.OrdinalIgnoreCase))
+                moduleCount++;
+                if (ModuleBase == 0 && mod.ModuleName!.Equals(moduleName, StringComparison.OrdinalIgnoreCase))
                 {
                     ModuleBase = (ulong)mod.BaseAddress.ToInt64();
                     ModuleSize = (ulong)mod.ModuleMemorySize;
+                    if (ModulePath.Length == 0) ModulePath = mod.FileName ?? "";
+                    try { FileVersion = mod.FileVersionInfo.FileVersion ?? ""; }
+                    catch (Exception ex) { Log.Warn($"Reading the exe's version info failed: {ex.Message}"); }
                     Log.Info($"Module {mod.ModuleName}: base {Log.Hex(ModuleBase)}, size {Log.Hex(ModuleSize)}, " +
-                             $"file '{mod.FileName}', version '{mod.FileVersionInfo.FileVersion}'.");
-                    break;
+                             $"file '{mod.FileName}', version '{FileVersion}'.");
                 }
             }
         }
         catch (Exception ex)
         {
-            Log.Error("Enumerating process modules failed (bitness mismatch or access denied?).", ex);
+            Log.Error($"Enumerating process modules failed after {moduleCount} module(s) (bitness mismatch or access denied?).", ex);
             throw;
         }
 
         if (ModuleBase == 0)
+        {
+            // Tells us what the store build's main module is called if it differs from the exe name.
+            try
+            {
+                Log.Error($"Module '{moduleName}' not among {moduleCount} modules. First modules: " +
+                          string.Join(", ", proc.Modules.Cast<ProcessModule>().Take(12).Select(m => m.ModuleName)));
+            }
+            catch { /* already logged above */ }
             throw new InvalidOperationException("Could not locate game module.");
+        }
 
+        ReadPeHeader();
+        Log.Info($"Build fingerprint: {Fingerprint}.");
         _failedReads = 0;
+    }
+
+    /// TimeDateStamp and SizeOfImage from the PE header in memory: identifies the exact build even
+    /// when the exe itself can't be opened (Game Pass installs sit in a locked folder).
+    private void ReadPeHeader()
+    {
+        if (ReadUInt16(ModuleBase) != 0x5A4D) { Log.Warn("No 'MZ' at module base; PE header not read."); return; }
+        ulong nt = ModuleBase + (ulong)ReadInt32(ModuleBase + 0x3C);
+        if (ReadUInt32(nt) != 0x00004550) { Log.Warn($"No PE signature at {Log.Hex(nt)}."); return; }
+        PeTimestamp = ReadUInt32(nt + 0x08);     // IMAGE_FILE_HEADER.TimeDateStamp
+        PeSizeOfImage = ReadUInt32(nt + 0x50);   // IMAGE_OPTIONAL_HEADER64.SizeOfImage
+    }
+
+    private static string QueryImagePath(IntPtr handle)
+    {
+        var sb = new StringBuilder(1024);
+        int size = sb.Capacity;
+        if (Win32.QueryFullProcessImageName(handle, 0, sb, ref size)) return sb.ToString();
+        Log.Warn($"QueryFullProcessImageName failed, Win32 error {System.Runtime.InteropServices.Marshal.GetLastWin32Error()}.");
+        return "";
     }
 
     public void Detach()
@@ -254,6 +306,41 @@ public class ProcessMemory : IDisposable
         return 0;
     }
 
+    /// Allocates executable memory anywhere in the game process. Returns 0 on failure.
+    public ulong Allocate(int size)
+    {
+        ulong p = Win32.VirtualAllocEx(_handle, 0, (UIntPtr)size, Win32.MEM_COMMIT | Win32.MEM_RESERVE, Win32.PAGE_EXECUTE_READWRITE);
+        if (p == 0) Log.Error($"VirtualAllocEx({size}) failed, Win32 error {System.Runtime.InteropServices.Marshal.GetLastWin32Error()}.");
+        return p;
+    }
+
+    /// <summary>
+    /// Runs code in the game on a new thread (rcx = <paramref name="parameter"/>) and waits for it.
+    /// Returns false if the thread couldn't start or didn't finish in time.
+    /// </summary>
+    public bool RunRemote(ulong code, ulong parameter, uint timeoutMs = 5000)
+    {
+        IntPtr thread = Win32.CreateRemoteThread(_handle, IntPtr.Zero, UIntPtr.Zero, code, parameter, 0, out uint tid);
+        if (thread == IntPtr.Zero)
+        {
+            Log.Error($"CreateRemoteThread failed, Win32 error {System.Runtime.InteropServices.Marshal.GetLastWin32Error()}.");
+            return false;
+        }
+        try
+        {
+            uint wait = Win32.WaitForSingleObject(thread, timeoutMs);
+            if (wait != Win32.WAIT_OBJECT_0)
+            {
+                Log.Error($"Remote thread {tid} didn't finish within {timeoutMs} ms (wait result {wait}).");
+                return false;
+            }
+            Win32.GetExitCodeThread(thread, out uint exit);
+            Log.Debug($"Remote thread {tid} finished, exit code {exit}.");
+            return true;
+        }
+        finally { Win32.CloseHandle(thread); }
+    }
+
     private bool Write(ulong address, byte[] b, string what)
     {
         bool ok = Win32.WriteProcessMemory(_handle, address, b, b.Length, out int written) && written == b.Length;
@@ -356,6 +443,22 @@ public class ProcessMemory : IDisposable
                 ulong s = Math.Max(mbi.BaseAddress, addr), e = Math.Min(mbi.BaseAddress + mbi.RegionSize, end);
                 if (e > s && e - s < int.MaxValue) list.Add((s, (int)(e - s)));
             }
+            addr = mbi.BaseAddress + mbi.RegionSize;
+        }
+        return list;
+    }
+
+    /// Every region of the game module (diagnostics: shows packed or partly unreadable images).
+    public List<(ulong Base, ulong Size, uint State, uint Protect, uint Type)> ModuleRegions()
+    {
+        var list = new List<(ulong, ulong, uint, uint, uint)>();
+        ulong addr = ModuleBase, end = ModuleBase + ModuleSize;
+        while (addr < end)
+        {
+            if (Win32.VirtualQueryEx(_handle, addr, out var mbi,
+                    (uint)System.Runtime.InteropServices.Marshal.SizeOf<Win32.MEMORY_BASIC_INFORMATION>()) == 0)
+                break;
+            list.Add((mbi.BaseAddress, mbi.RegionSize, mbi.State, mbi.Protect, mbi.Type));
             addr = mbi.BaseAddress + mbi.RegionSize;
         }
         return list;
