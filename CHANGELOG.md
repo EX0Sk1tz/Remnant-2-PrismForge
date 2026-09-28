@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.2.0 (2026-09-28)
 
 - **Build codes.** Plan a prism on the new [Prismforge Planner](https://ex0sk1tz.github.io/prismforge-planner/)
   web page and import it: paste the code under **Build code** on the Prisms page and press **Import**.
