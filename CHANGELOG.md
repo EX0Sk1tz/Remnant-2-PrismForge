@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1 (2026-09-29)
+
+- **Legendaries in normal slots.** The segment picker of a normal slot now lists legendary segments too
+  (grouped last), so any segment can be turned into a legendary. Legendary slots still offer only
+  legendaries. The gold label and the legendary note follow the segment you picked, before Apply.
+
 ## 2.2.0 (2026-09-28)
 
 - **Build codes.** Plan a prism on the new [Prismforge Planner](https://ex0sk1tz.github.io/prismforge-planner/)
