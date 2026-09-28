@@ -54,7 +54,7 @@ public partial class MainViewModel : ObservableObject
 
     public ObservableCollection<PrismData> Prisms { get; } = new();
 
-    /// Choices for a normal segment (standard + fusion), a legendary segment, and a fed fragment.
+    /// Choices for a normal segment (standard, fusion and legendary), a legendary segment, and a fed fragment.
     public ICollectionView SegmentChoices { get; }
     public ICollectionView LegendaryChoices { get; }
     public ICollectionView FragmentChoices { get; }
@@ -346,8 +346,9 @@ public partial class MainViewModel : ObservableObject
         _fragmentChoices.Clear();
         foreach (var d in _catalog.All.Where(d => d.IsResolved))
         {
+            // A normal slot can take any row (legendaries last, in their own group); a legendary slot only legendaries.
+            _segmentChoices.Add(d);
             if (d.Kind == SegmentKind.Legendary) _legendaryChoices.Add(d);
-            else _segmentChoices.Add(d);
             if (d.Kind == SegmentKind.Standard) _fragmentChoices.Add(d);
         }
     }
