@@ -48,6 +48,7 @@ public static class GameOffsets
     public const ulong Data_SegMax       = 0x64;   // allocated capacity; spare slots exist after the game grew the array
     public const ulong Data_FeedPtr      = 0x70;   // CurrentFeedData ("Roll Chances" in the CT)
     public const ulong Data_FeedCount    = 0x78;
+    public const ulong Data_FeedMax      = 0x7C;
     public const ulong Data_Xp           = 0x84;   // PendingExperience (float)
 
     // ── Segment (CurrentSegments element) ────────────────────────

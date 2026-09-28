@@ -25,6 +25,8 @@ No save-file juggling: change a value, press Apply, and it is live in the game.
   the game reserved itself. **Make room** gets that room on a prism that already has its legendary
   (see Usage).
 - Remove or reorder any segment or fed fragment, or **Reset prism** to a blank one.
+- **Build codes**: plan a prism on the [Prismforge Planner](https://ex0sk1tz.github.io/prismforge-planner/)
+  web page and import it in one step, or copy a prism as a code to share it.
 
 **Attributes**
 - Live list of about 220 character stats (damage, crit, weak spot, speeds, resistances, caps…).
@@ -80,6 +82,14 @@ To uninstall, delete the exe. Settings and logs live in `%LocalAppData%\Prismfor
   spare room, so Add segment works right after.
 - **Reset prism** makes the prism blank again (no segments, no fed fragments, XP and level 0), for
   example to start over on a prism you changed days ago. It asks first.
+
+**Build codes**
+- Build a prism on the [Prismforge Planner](https://ex0sk1tz.github.io/prismforge-planner/) (or press
+  **Open planner**) and copy its build code.
+- In Prismforge, pick the prism, paste the code under **Build code** at the bottom and press **Import**.
+  It shows what the code contains and asks first, then replaces the prism's segments and fed fragments
+  (and its pending XP, if the code has one). Full lists get more room automatically.
+- **Copy code** copies the selected prism as a build code, to share it or edit it on the planner page.
 
 **Attributes tab**
 1. Search or filter the stats.

@@ -725,6 +725,73 @@ public partial class MainViewModel : ObservableObject
                   r.Notes.Count > 0 ? Tone.Warn : Tone.Good);
     }
 
+    /// Build code pasted on the Prisms page (from the planner web page or "Copy code").
+    [ObservableProperty] private string _buildCodeText = "";
+
+    /// Replaces the selected prism's segments, fed fragments and XP with those of a build code.
+    [RelayCommand]
+    private async Task ImportBuildAsync()
+    {
+        var p = SelectedPrism;
+        if (!CanChangeSegmentCount(p)) return;
+        if (p!.HasRoomBackup)
+        {
+            SetStatus("Finish Make room first (pick the legendary in game) or press Restore legendary.", Tone.Warn);
+            return;
+        }
+        BuildSpec spec;
+        try { spec = BuildCode.Decode(BuildCodeText); }
+        catch (FormatException ex)
+        {
+            SetStatus(ex.Message, Tone.Bad);
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            $"Build {p.Name} {p.Numeral} from this code?\n\n{BuildCode.Describe(spec, _catalog)}\n" +
+            "This replaces all segments and fed fragments on the prism" + (spec.Xp != null ? " and its pending XP" : "") +
+            ". The game saves it with the character. The old entries are written to the log.",
+            "Import build code", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
+        if (answer != MessageBoxResult.OK) return;
+
+        var r = _writer!.ApplyBuild(p, spec, _catalog);
+        _forceScan = true;
+        if (!r.Ok)
+        {
+            SetStatus(r.Problems[0], Tone.Bad);
+            return;
+        }
+        await TickAsync();
+        BuildCodeText = "";
+        string who = spec.Note.Length > 0 ? $" ({spec.Note})" : "";
+        SetStatus($"Build imported{who}: {spec.Segments.Count} segment(s), {spec.Feeds.Count} fed fragment(s). Unequip and re-equip the prism in game."
+                  + (r.Notes.Count > 0 ? " " + string.Join(" ", r.Notes) : ""), r.Notes.Count > 0 ? Tone.Warn : Tone.Good);
+    }
+
+    /// Copies the selected prism's layout as a build code (can be opened in the planner or imported elsewhere).
+    [RelayCommand]
+    private void CopyBuildCode()
+    {
+        if (SelectedPrism == null) return;
+        try
+        {
+            Clipboard.SetText(BuildCode.Encode(PrismWriter.ToSpec(SelectedPrism)));
+            SetStatus("Build code of this prism copied to the clipboard.", Tone.Good);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Copying the build code failed.", ex);
+            SetStatus("Copying to the clipboard failed. Try again.", Tone.Bad);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenPlanner()
+    {
+        try { Process.Start(new ProcessStartInfo(AppInfo.PlannerUrl) { UseShellExecute = true }); }
+        catch (Exception ex) { Log.Error("Could not open the planner page.", ex); }
+    }
+
     /// Shared flow of the remove/move commands: checks, write, rescan, status.
     private async Task RunArrayEdit(SlotBase? slot, Func<PrismData, CommitResult> edit, string done)
     {

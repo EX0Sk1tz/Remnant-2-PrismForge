@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Build codes.** Plan a prism on the new [Prismforge Planner](https://ex0sk1tz.github.io/prismforge-planner/)
+  web page and import it: paste the code under **Build code** on the Prisms page and press **Import**.
+  The prism's segments, fed fragments and (if the code has one) pending XP are replaced; Prismforge
+  shows the content and asks first. **Copy code** turns an existing prism into a code.
+
 ## 2.1.0 (2026-09-28)
 
 - **Add segment works on any prism, any time.** When the list is full, Prismforge first gives it a

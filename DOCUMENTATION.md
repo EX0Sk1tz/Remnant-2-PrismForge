@@ -233,6 +233,22 @@ when GMalloc wasn't found.
   added segments can be changed, levelled and take effect.
 - Still untested: a game-side grow (the game adding its own pick to a full array we allocated).
 
+### Build codes (2026-09-28)
+
+`Game/BuildCode.cs` and the planner page (`EX0Sk1tz/prismforge-planner`, `index.html`) share one format:
+`PF1-` + base64url without padding of raw DEFLATE of UTF-8 JSON
+`{ "v":1, "n":note, "xp":float, "s":[[row, level]…], "f":[[row, level]…] }`. Rows are catalog row
+names, compared case-insensitively. Limits: 256 segments (0–100,000,000), 128 fed fragments (0–999),
+note 200 characters; `n` and `xp` are optional. The page encodes with `CompressionStream("deflate-raw")`.
+Round trip JS → C# → JS checked with umlauts, level 100,000,000 and fractional XP.
+
+`PrismWriter.ApplyBuild` resolves every row first (nothing is written if one is unknown), then
+replaces each array with `ReplaceArray`: grow through GMalloc if the build needs more than Max, Num 0,
+write all entries, Num = count, read back. Segment entries are built like Add segment (FName, level,
+action -1, class default object or null). CurrentFeedData is a TArray like CurrentSegments: Data
+`+0x70`, Num `+0x78`, Max `+0x7C`, stride 0x0C; it is grown the same way. Pending XP is written only
+if the code has `xp`. The internal level (`+0x28`) is left alone. Untested in game so far.
+
 ### Remove, reorder, reset (tested on Steam, 2026-09-28)
 
 Confirmed in game, persistent through save and reload: moving a segment, removing a normal segment

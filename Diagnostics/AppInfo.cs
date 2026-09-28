@@ -13,6 +13,8 @@ public static class AppInfo
     /// Fill these in once the pages exist; empty links are hidden in the About panel.
     public const string NexusUrl = "";
     public const string SourceUrl = "https://github.com/EX0Sk1tz/Remnant-2-PrismForge";
+    /// Web page for planning a prism and getting its build code (see Game/BuildCode.cs).
+    public const string PlannerUrl = "https://ex0sk1tz.github.io/prismforge-planner/";
 
     public static string Version { get; } =
         Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion

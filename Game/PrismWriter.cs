@@ -139,41 +139,167 @@ public sealed class PrismWriter
     /// The old buffer is deliberately not freed: a game thread might still be reading it, and it's
     /// only Max × 0x28 bytes. Returns the new buffer, or a problem.
     /// </summary>
-    private (ulong Buffer, string? Problem) GrowSegments(PrismData p, int num, int max)
-    {
-        int stride = (int)GameOffsets.Seg_Stride;
-        int newMax = Math.Min(num + GrowBy, PrismScanner.MaxSegmentCapacity);
-        if (newMax <= num) return (0, $"The prism already has the most segments the editor allows ({num}).");
+    private (ulong Buffer, string? Problem) GrowSegments(PrismData p, int num, int max) =>
+        GrowArray(p, SegmentArray, p.SegmentsAddress, num, max, Math.Min(num + GrowBy, SegmentArray.Cap));
 
-        var content = new byte[newMax * stride];
-        if (num > 0 && !_mem.TryReadBytes(p.SegmentsAddress, content, num * stride)) return (0, "Reading the segments failed.");
+    /// Where a prism TArray lives in the prism data, its element size and the editor's limit.
+    private sealed record ArrayInfo(ulong PtrOff, ulong NumOff, ulong MaxOff, int Stride, int Cap, string What);
+
+    private static readonly ArrayInfo SegmentArray = new(GameOffsets.Data_SegPtr, GameOffsets.Data_SegCount, GameOffsets.Data_SegMax,
+                                                         (int)GameOffsets.Seg_Stride, PrismScanner.MaxSegmentCapacity, "segment");
+    private static readonly ArrayInfo FeedArray = new(GameOffsets.Data_FeedPtr, GameOffsets.Data_FeedCount, GameOffsets.Data_FeedMax,
+                                                      (int)GameOffsets.Feed_Stride, BuildCode.MaxFeeds, "fed fragment");
+
+    private (ulong Buffer, string? Problem) GrowArray(PrismData p, ArrayInfo a, ulong oldPtr, int num, int max, int newMax)
+    {
+        if (newMax <= num) return (0, $"The prism already has the most {a.What}s the editor allows ({num}).");
+
+        var content = new byte[newMax * a.Stride];
+        if (num > 0 && !_mem.TryReadBytes(oldPtr, content, num * a.Stride)) return (0, $"Reading the {a.What}s failed.");
 
         ulong buf = Allocator!.Malloc(content.Length);
         if (buf == 0) return (0, "The game's allocator didn't return memory. Nothing was changed.");
-        if (!_mem.WriteBytes(buf, content, "grown segment buffer"))
+        if (!_mem.WriteBytes(buf, content, $"grown {a.What} buffer"))
         {
             Allocator.Free(buf);
-            return (0, "Filling the new segment buffer failed. Nothing was changed.");
+            return (0, $"Filling the new {a.What} buffer failed. Nothing was changed.");
         }
-        if (_scanner.CheckStale(p) != null || _scanner.ReadSegmentCapacity(p) != max)
+        if (_mem.ReadPointer(p.DataAddress + a.PtrOff) != oldPtr || _mem.ReadInt32(p.DataAddress + a.NumOff) != num
+            || _mem.ReadInt32(p.DataAddress + a.MaxOff) != max)
         {
             Allocator.Free(buf);
-            return (0, "The game changed this prism's segments meanwhile. Nothing was changed; rescan and try again.");
+            return (0, $"The game changed this prism's {a.What}s meanwhile. Nothing was changed; rescan and try again.");
         }
 
-        Log.Info($"Grow segments of '{p.Name}': {Log.Hex(p.SegmentsAddress)} (Num {num}, Max {max}) -> {Log.Hex(buf)} (Max {newMax}). " +
+        Log.Info($"Grow {a.What}s of '{p.Name}': {Log.Hex(oldPtr)} (Num {num}, Max {max}) -> {Log.Hex(buf)} (Max {newMax}). " +
                  "The old buffer stays allocated on purpose.");
-        if (!_mem.WritePointer(p.DataAddress + GameOffsets.Data_SegPtr, buf))
+        if (!_mem.WritePointer(p.DataAddress + a.PtrOff, buf))
         {
             Allocator.Free(buf);
-            return (0, "Switching to the new segment buffer failed. Nothing was changed.");
+            return (0, $"Switching to the new {a.What} buffer failed. Nothing was changed.");
         }
-        if (!_mem.WriteInt32(p.DataAddress + GameOffsets.Data_SegMax, newMax))
-            return (0, "Raising the segment capacity failed. The prism works, but has no spare room yet; rescan.");
-        if (_mem.ReadPointer(p.DataAddress + GameOffsets.Data_SegPtr) != buf || _scanner.ReadSegmentCapacity(p) != newMax)
-            return (0, "The new segment buffer doesn't read back. Rescan and check the prism.");
+        if (!_mem.WriteInt32(p.DataAddress + a.MaxOff, newMax))
+            return (0, $"Raising the {a.What} capacity failed. The prism works, but has no spare room yet; rescan.");
+        if (_mem.ReadPointer(p.DataAddress + a.PtrOff) != buf || _mem.ReadInt32(p.DataAddress + a.MaxOff) != newMax)
+            return (0, $"The new {a.What} buffer doesn't read back. Rescan and check the prism.");
         return (buf, null);
     }
+
+    /// <summary>
+    /// Replaces the prism's segments, fed fragments and (if given) pending XP with a build code's.
+    /// Arrays that are too small get a bigger buffer from the game's allocator first. Each list is
+    /// written with Num 0 in between, so the game never sees a count covering unwritten entries.
+    /// </summary>
+    public CommitResult ApplyBuild(PrismData p, BuildSpec b, SegmentCatalog catalog)
+    {
+        string? stale = _scanner.CheckStale(p);
+        if (stale != null) return Fail(stale + " Rescan and try again.");
+
+        var segDefs = new List<(SegmentDef Def, int Level)>();
+        var feedDefs = new List<(SegmentDef Def, int Level)>();
+        foreach (var (row, level) in b.Segments)
+        {
+            var d = catalog.ByRow(row);
+            if (d is not { IsResolved: true }) return Fail($"Segment '{row}' isn't known to the running game. Nothing was changed.");
+            segDefs.Add((d, level));
+        }
+        foreach (var (row, level) in b.Feeds)
+        {
+            var d = catalog.ByRow(row);
+            if (d is not { IsResolved: true }) return Fail($"Fed fragment '{row}' isn't known to the running game. Nothing was changed.");
+            feedDefs.Add((d, level));
+        }
+
+        var notes = new List<string>();
+        if (p.Segments.Count > 0)
+        {
+            byte[] old = _mem.ReadBytes(p.SegmentsAddress, p.Segments.Count * SegmentArray.Stride);
+            Log.Info($"Apply build to '{p.Name}': segments before: {Convert.ToHexString(old)}");
+            for (int o = 0; o < old.Length; o += SegmentArray.Stride)
+                if (BitConverter.ToInt32(old, o + (int)GameOffsets.Seg_Action) != -1)
+                {
+                    notes.Add("A legendary with an active ability was replaced. Unequip and re-equip the prism, or reload the character, so the game drops it.");
+                    break;
+                }
+        }
+
+        // Segments: FName {id, 0}, level, action -1, 16 zero bytes, class object (as AddSegment).
+        var segBytes = new byte[segDefs.Count * SegmentArray.Stride];
+        bool unloaded = false;
+        for (int i = 0; i < segDefs.Count; i++)
+        {
+            var (def, level) = segDefs[i];
+            int o = i * SegmentArray.Stride;
+            ulong obj = _scanner.DefaultObjectFor(def);
+            if (def.HasClass && obj == 0 && !unloaded)
+            {
+                unloaded = true;
+                notes.Add("Some segments aren't loaded in the game yet; their effect starts after you reload the character.");
+            }
+            BitConverter.GetBytes(def.NameId).CopyTo(segBytes, o + (int)GameOffsets.Seg_RowName);
+            BitConverter.GetBytes(level).CopyTo(segBytes, o + (int)GameOffsets.Seg_Level);
+            BitConverter.GetBytes(-1).CopyTo(segBytes, o + (int)GameOffsets.Seg_Action);
+            BitConverter.GetBytes(obj).CopyTo(segBytes, o + (int)GameOffsets.Seg_Object);
+        }
+        // Fed fragments: FName {id, 0}, FedLevel.
+        var feedBytes = new byte[feedDefs.Count * FeedArray.Stride];
+        for (int i = 0; i < feedDefs.Count; i++)
+        {
+            int o = i * FeedArray.Stride;
+            BitConverter.GetBytes(feedDefs[i].Def.NameId).CopyTo(feedBytes, o + (int)GameOffsets.Feed_RowName);
+            BitConverter.GetBytes(feedDefs[i].Level).CopyTo(feedBytes, o + (int)GameOffsets.Feed_Level);
+        }
+
+        if ((HeaderProblem(p, SegmentArray, p.SegmentsAddress, p.Segments.Count) ?? HeaderProblem(p, FeedArray, p.FeedAddress, p.Feeds.Count)) is string bad)
+            return Fail(bad + " Nothing was changed.");
+        Log.Info($"Apply build to '{p.Name}': {segDefs.Count} segment(s), {feedDefs.Count} fed fragment(s), XP {(b.Xp?.ToString() ?? "unchanged")}.");
+        string? problem = ReplaceArray(p, SegmentArray, p.SegmentsAddress, p.Segments.Count, segBytes, notes)
+                       ?? ReplaceArray(p, FeedArray, p.FeedAddress, p.Feeds.Count, feedBytes, notes);
+        if (problem != null) return Fail(problem);
+        if (b.Xp is float xp && !_mem.WriteFloat(p.DataAddress + GameOffsets.Data_Xp, xp)) return Fail("Writing the XP failed.");
+        return new CommitResult(segDefs.Count + feedDefs.Count, Array.Empty<string>(), notes);
+    }
+
+    /// A TArray header the editor won't write through (Max below Num, Max without a buffer, absurd Max).
+    private string? HeaderProblem(PrismData p, ArrayInfo a, ulong ptr, int num)
+    {
+        int max = _mem.ReadInt32(p.DataAddress + a.MaxOff);
+        return max < 0 || max > 4096 || max < num || (ptr == 0 && max > 0)
+            ? $"The {a.What} array looks invalid (Data {Log.Hex(ptr)}, Num {num}, Max {max}). Rescan and check the prism."
+            : null;
+    }
+
+    /// Writes <paramref name="entries"/> as the whole content of a prism TArray, growing it first if needed.
+    private string? ReplaceArray(PrismData p, ArrayInfo a, ulong ptr, int num, byte[] entries, List<string> notes)
+    {
+        int count = entries.Length / a.Stride;
+        int max = _mem.ReadInt32(p.DataAddress + a.MaxOff);
+        if (HeaderProblem(p, a, ptr, num) is string bad) return bad;
+        if (count > max)
+        {
+            if (Allocator is not { IsAvailable: true })
+                return $"The build needs {count} {a.What} slots, the prism has {max}, and the game's allocator wasn't found.";
+            var (grown, problem) = GrowArray(p, a, ptr, num, max, Math.Min(count + GrowBy, Math.Max(a.Cap, count)));
+            if (problem != null) return problem;
+            ptr = grown;
+            notes.Add($"The {a.What} list got a bigger buffer from the game's allocator.");
+        }
+
+        if (!_mem.WriteInt32(p.DataAddress + a.NumOff, 0)) return $"Clearing the {a.What}s failed.";
+        if (count > 0 && !_mem.WriteBytes(ptr, entries, $"{a.What}s from build code"))
+            return $"Writing the {a.What}s failed. The prism now has no {a.What}s; the old ones are in the log.";
+        if (!_mem.WriteInt32(p.DataAddress + a.NumOff, count)) return $"Setting the {a.What} count failed. Rescan and check the prism.";
+        if (_mem.ReadInt32(p.DataAddress + a.NumOff) != count
+            || (count > 0 && !_mem.ReadBytes(ptr, 0x0C).AsSpan().SequenceEqual(entries.AsSpan(0, 0x0C))))
+            return $"The {a.What}s don't read back. Rescan and check the prism.";
+        return null;
+    }
+
+    /// The prism's current layout as a build spec (for "Copy code").
+    public static BuildSpec ToSpec(PrismData p, string note = "") => new(
+        note, p.Xp,
+        p.Segments.Select(s => (s.Def.Row, s.Level)).ToList(),
+        p.Feeds.Select(f => (f.Def.Row, f.Level)).ToList());
 
     /// The game only adds a segment (and so reallocates the array) while a prism has at most this
     /// many normal segments: with 5 it added the legendary pick, with 6 it ignored the pick.
