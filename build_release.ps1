@@ -37,7 +37,7 @@ Remove-Item $stage -Recurse -Force
 # Source package: everything needed to build, without build output, logs or IDE state.
 $srcZip = "Release\Prismforge_v$version`_source.zip"
 if (Test-Path $srcZip) { Remove-Item $srcZip }
-$exclude = '^(bin|obj|publish|Release|logs|GamePassTestFiles|\.vs|\.git|\{.*\})(\\|$)'
+$exclude = '^(bin|obj|publish|Release|logs|GamePassTestFiles|BeyondHellMod|\.vs|\.git|\{.*\})(\\|$)|^Prismforge_Diag_[^\\]*\.txt$'
 $root = (Get-Location).Path
 $files = Get-ChildItem -Recurse -File | Where-Object { $_.FullName.Substring($root.Length + 1) -notmatch $exclude }
 $srcStage = Join-Path $env:TEMP "Prismforge_src_$version"

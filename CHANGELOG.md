@@ -1,19 +1,31 @@
 # Changelog
 
-## 2.2.1 (2026-09-29)
+## 2.3.0
+
+- **Mod support (Beyond Hell).** Prismforge now reads the prism tables from the running game. Segments
+  a mod adds (such as Beyond Hell's new fusions and legendaries) can be picked, show their in-game
+  names and descriptions, and are tagged with the mod's name. Legendaries a mod replaces or switches off
+  are shown correctly, and switched-off ones are no longer offered. Without mods nothing changes; if the
+  tables can't be read, the built-in segment list is used as before.
+- **Legendary slots can take any segment.** A legendary can now be changed to a fusion or a single
+  stat (and back), like any other segment.
+- **Search in the segment picker.** Type to filter by name or effect (e.g. "crit", "grey health",
+  "beyond hell"); every word must match. Down moves into the list, Enter takes the first match.
+
+## 2.2.1
 
 - **Legendaries in normal slots.** The segment picker of a normal slot now lists legendary segments too
   (grouped last), so any segment can be turned into a legendary. Legendary slots still offer only
   legendaries. The gold label and the legendary note follow the segment you picked, before Apply.
 
-## 2.2.0 (2026-09-28)
+## 2.2.0
 
 - **Build codes.** Plan a prism on the new [Prismforge Planner](https://ex0sk1tz.github.io/prismforge-planner/)
   web page and import it: paste the code under **Build code** on the Prisms page and press **Import**.
   The prism's segments, fed fragments and (if the code has one) pending XP are replaced; Prismforge
   shows the content and asks first. **Copy code** turns an existing prism into a code.
 
-## 2.1.0 (2026-09-28)
+## 2.1.0
 
 - **Add segment works on any prism, any time.** When the list is full, Prismforge first gives it a
   bigger buffer from the game's own memory allocator, so no Make room, XP or legendary pick is needed.
@@ -30,7 +42,7 @@
   save and reload.
 - **Remove added** is replaced by the above.
 
-## 2.0.0 (2026-09-27)
+## 2.0.0
 
 - **Game Pass / Microsoft Store version supported.** Reading, Apply and Hold were confirmed by a tester.
 - New **Support zip** button: packs logs, diagnostic reports and a state summary into one file to send.

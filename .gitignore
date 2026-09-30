@@ -6,6 +6,10 @@ logs/
 
 # Testers' logs and support zips (contain local paths)
 GamePassTestFiles/
+Prismforge_Diag_*.txt
+
+# Separate mod project, not part of Prismforge
+BeyondHellMod/
 
 # Release packages (uploaded to Nexus / GitHub Releases, not committed)
 Release/*.zip
