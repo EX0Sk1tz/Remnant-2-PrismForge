@@ -227,6 +227,102 @@ public sealed class AllEqualConverter : IMultiValueConverter
     public object[] ConvertBack(object value, Type[] t, object p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>
+/// Search box of the stat picker. The typed text is kept on the ComboBox (<c>PickerSearch.Text</c>);
+/// items that don't match are collapsed rather than filtered out of the choice list, because every
+/// picker shares that list and filtering it would clear the other pickers' selection.
+/// </summary>
+public static class PickerSearch
+{
+    public static readonly DependencyProperty TextProperty = DependencyProperty.RegisterAttached(
+        "Text", typeof(string), typeof(PickerSearch), new PropertyMetadata(""));
+    public static string GetText(DependencyObject o) => (string)o.GetValue(TextProperty);
+    public static void SetText(DependencyObject o, string v) => o.SetValue(TextProperty, v);
+
+    /// Set on the TextBox inside the picker's template: focus it when the list opens, clear it when it closes.
+    public static readonly DependencyProperty IsBoxProperty = DependencyProperty.RegisterAttached(
+        "IsBox", typeof(bool), typeof(PickerSearch), new PropertyMetadata(false, OnIsBoxChanged));
+    public static bool GetIsBox(DependencyObject o) => (bool)o.GetValue(IsBoxProperty);
+    public static void SetIsBox(DependencyObject o, bool v) => o.SetValue(IsBoxProperty, v);
+
+    private static readonly DependencyProperty HookedProperty = DependencyProperty.RegisterAttached(
+        "Hooked", typeof(bool), typeof(PickerSearch), new PropertyMetadata(false));
+
+    /// Every word must appear in the name, the effect text, the group or the mod name.
+    public static bool Matches(SegmentDef d, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return true;
+        foreach (string word in query.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            if (!(Has(d.Name, word) || Has(d.Description, word) || Has(d.Group, word) || Has(d.ModSource, word)))
+                return false;
+        return true;
+    }
+
+    private static bool Has(string? s, string word) => s?.Contains(word, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static void OnIsBoxChanged(DependencyObject o, DependencyPropertyChangedEventArgs e)
+    {
+        if (o is not System.Windows.Controls.TextBox box || e.NewValue is not true) return;
+        box.Loaded += (_, _) => Hook(box);
+        box.PreviewKeyDown += OnBoxKey;
+    }
+
+    private static void Hook(System.Windows.Controls.TextBox box)
+    {
+        if (box.TemplatedParent is not System.Windows.Controls.ComboBox combo) return;
+        // The popup's content is loaded on first open, after DropDownOpened already fired.
+        if (combo.IsDropDownOpen) FocusLater(box);
+        if ((bool)combo.GetValue(HookedProperty)) return;
+        combo.SetValue(HookedProperty, true);
+        combo.DropDownOpened += (_, _) => FocusLater(box);
+        combo.DropDownClosed += (_, _) => SetText(combo, "");
+    }
+
+    // After the ComboBox has moved focus to the selected item.
+    private static void FocusLater(System.Windows.Controls.TextBox box)
+        => box.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () => box.Focus());
+
+    /// Down moves into the list, Enter takes the first match.
+    private static void OnBoxKey(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        var box = (System.Windows.Controls.TextBox)sender;
+        if (box.TemplatedParent is not System.Windows.Controls.ComboBox combo) return;
+        if (e.Key is not (System.Windows.Input.Key.Down or System.Windows.Input.Key.Enter)) return;
+        var first = combo.Items.OfType<object>()
+            .Select(i => combo.ItemContainerGenerator.ContainerFromItem(i) as System.Windows.Controls.ComboBoxItem)
+            .FirstOrDefault(c => c is { IsVisible: true });
+        if (first == null) return;
+        if (e.Key == System.Windows.Input.Key.Down) first.Focus();
+        else
+        {
+            combo.SelectedItem = first.DataContext;
+            combo.IsDropDownOpen = false;
+        }
+        e.Handled = true;
+    }
+}
+
+/// Picker search: [0] a SegmentDef, a group (CollectionViewGroup) or the whole item list, [1] the
+/// search text. Visible when it matches (a group or list: when any of its segments does).
+/// Parameter "none" inverts, for the "nothing found" line.
+public sealed class PickerMatchConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type t, object p, CultureInfo c)
+    {
+        string? q = values.Length > 1 ? values[1] as string : null;
+        bool any = string.IsNullOrWhiteSpace(q) || values[0] switch
+        {
+            SegmentDef d => PickerSearch.Matches(d, q),
+            CollectionViewGroup g => g.Items.OfType<SegmentDef>().Any(d => PickerSearch.Matches(d, q)),
+            System.Collections.IEnumerable items => items.OfType<SegmentDef>().Any(d => PickerSearch.Matches(d, q)),
+            _ => true,
+        };
+        if (p as string == "none") any = !any;
+        return any ? Visibility.Visible : Visibility.Collapsed;
+    }
+    public object[] ConvertBack(object value, Type[] t, object p, CultureInfo c) => throw new NotSupportedException();
+}
+
 public sealed class ToneToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type t, object p, CultureInfo c)

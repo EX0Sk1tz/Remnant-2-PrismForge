@@ -416,6 +416,10 @@
                                                         <TextBlock Text="{Binding EditDef.Name}" FontSize="17" Foreground="{StaticResource TextBrush}"/>
                                                         <TextBlock x:Name="kind" Text="{Binding EditDef.Group, Converter={StaticResource Tracked}}"
                                                                    Style="{StaticResource Eyebrow}" Margin="12,2,0,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding EditDef.ModSource, Converter={StaticResource Tracked}}"
+                                                                   Style="{StaticResource Eyebrow}" Foreground="{StaticResource GoodBrush}"
+                                                                   Margin="10,2,0,0" VerticalAlignment="Center"
+                                                                   Visibility="{Binding EditDef.ModSource, Converter={StaticResource NullVis}}"/>
                                                     </StackPanel>
                                                     <TextBlock Text="{Binding EditDef.Description}" FontSize="12" Foreground="{StaticResource TextFaintBrush}"
                                                                TextWrapping="Wrap" Margin="0,3,0,0"/>
@@ -492,16 +496,20 @@
                                             <DataTrigger Binding="{Binding IsLevelRisky}" Value="True">
                                                 <Setter TargetName="levelNote" Property="Foreground" Value="{StaticResource WarnBrush}"/>
                                             </DataTrigger>
-                                            <DataTrigger Binding="{Binding Def.Kind}" Value="{x:Static g:SegmentKind.Legendary}">
-                                                <Setter TargetName="picker" Property="ItemsSource"
-                                                        Value="{Binding DataContext.LegendaryChoices, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                            </DataTrigger>
                                             <DataTrigger Binding="{Binding EditDef.Kind}" Value="{x:Static g:SegmentKind.Legendary}">
                                                 <Setter TargetName="kind" Property="Foreground" Value="#E6CF8F"/>
                                             </DataTrigger>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
                                                     <Condition Binding="{Binding EditDef.Kind}" Value="{x:Static g:SegmentKind.Legendary}"/>
+                                                    <Condition Binding="{Binding IsRowDirty}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter TargetName="legendNote" Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                            <!-- A legendary turned into a fusion or single stat: its effect goes the same way -->
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Def.Kind}" Value="{x:Static g:SegmentKind.Legendary}"/>
                                                     <Condition Binding="{Binding IsRowDirty}" Value="True"/>
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter TargetName="legendNote" Property="Visibility" Value="Visible"/>

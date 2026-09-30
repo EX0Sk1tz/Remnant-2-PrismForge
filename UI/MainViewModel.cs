@@ -23,7 +23,12 @@ public enum Tone { Neutral, Good, Warn, Bad }
 /// </summary>
 public partial class MainViewModel : ObservableObject
 {
-    private readonly SegmentCatalog _catalog = SegmentCatalog.Load();
+    /// Embedded rows, replaced by a fresh copy on every attach and then merged with the running
+    /// game's prism tables (see LoadLiveTablesAsync), so mods that change them are picked up.
+    private SegmentCatalog _catalog = SegmentCatalog.Load();
+    private bool _tablesRead, _tablesLoading;
+    private int _tableAttempts;
+    private const int MaxTableAttempts = 10;
     private GameTarget? _target;
     private ProcessMemory? _mem;
     private FNameReader? _names;
@@ -54,12 +59,10 @@ public partial class MainViewModel : ObservableObject
 
     public ObservableCollection<PrismData> Prisms { get; } = new();
 
-    /// Choices for a normal segment (standard, fusion and legendary), a legendary segment, and a fed fragment.
+    /// Choices for a segment slot (standard, fusion and legendary, in any slot) and a fed fragment.
     public ICollectionView SegmentChoices { get; }
-    public ICollectionView LegendaryChoices { get; }
     public ICollectionView FragmentChoices { get; }
     private readonly ObservableCollection<SegmentDef> _segmentChoices = new();
-    private readonly ObservableCollection<SegmentDef> _legendaryChoices = new();
     private readonly ObservableCollection<SegmentDef> _fragmentChoices = new();
 
     public ObservableCollection<string> LogLines { get; } = new();
@@ -99,12 +102,11 @@ public partial class MainViewModel : ObservableObject
     public string PendingText => DirtyCount == 1 ? "1 prism with pending changes" : $"{DirtyCount} prisms with pending changes";
 
     public int ResolvedStats => _catalog.All.Count(d => d.IsResolved);
-    public int TotalStats => _catalog.All.Count;
+    public int TotalStats => _catalog.Active.Count();
 
     public MainViewModel()
     {
         SegmentChoices = MakeView(_segmentChoices);
-        LegendaryChoices = MakeView(_legendaryChoices);
         FragmentChoices = MakeView(_fragmentChoices);
         InitStatsView();
         InitShell();
@@ -215,6 +217,10 @@ public partial class MainViewModel : ObservableObject
         string? error = null;
         var mem = new ProcessMemory();
         var names = new FNameReader(mem);
+        // A previous session may have merged another game's (or another mod set's) tables.
+        _catalog = SegmentCatalog.Load();
+        _tablesRead = false;
+        _tableAttempts = 0;
         int resolved = 0;
         string? report = null;
         int attempt = ++_attachFailures;
@@ -342,13 +348,12 @@ public partial class MainViewModel : ObservableObject
     private void RebuildChoices()
     {
         _segmentChoices.Clear();
-        _legendaryChoices.Clear();
         _fragmentChoices.Clear();
-        foreach (var d in _catalog.All.Where(d => d.IsResolved))
+        foreach (var d in _catalog.All.Where(d => d.IsResolved && !d.IsDisabled))
         {
-            // A normal slot can take any row (legendaries last, in their own group); a legendary slot only legendaries.
+            // Any slot can take any row, legendaries last in their own group: a legendary can become a
+            // fusion or single stat and back.
             _segmentChoices.Add(d);
-            if (d.Kind == SegmentKind.Legendary) _legendaryChoices.Add(d);
             if (d.Kind == SegmentKind.Standard) _fragmentChoices.Add(d);
         }
     }
@@ -394,6 +399,7 @@ public partial class MainViewModel : ObservableObject
         _scanFailures = 0;
         MergeScan(found);
         IsInSync = true;
+        _ = LoadLiveTablesAsync();
         if (!_objectsIndexed)
         {
             _objectsIndexed = true;
@@ -452,6 +458,102 @@ public partial class MainViewModel : ObservableObject
             else
                 SetStatus(r.Problems[0] + " The removed segments are in the log.", Tone.Bad);
         }
+    }
+
+    /// Once per connection, after a successful scan: reads PrismStoneDataTable and
+    /// PrismStoneMythicDataTable from the game and merges them into the catalog. Rows added by mods
+    /// become pickable, and rows a mod points to a different segment class get that class.
+    /// Retried on later scans (the tables may not be loaded yet); the embedded catalog stays in use
+    /// when they can't be read.
+    private async Task LoadLiveTablesAsync()
+    {
+        if (_tablesRead || _tablesLoading || _tableAttempts >= MaxTableAttempts || _scanner == null) return;
+        _tablesLoading = true;
+        _tableAttempts++;
+        var scanner = _scanner;
+        var catalog = _catalog;
+        string? processName = _target?.ProcessName;
+        List<LiveSegmentRow>? rows = null;
+        string modLabel = "Mod";
+        try
+        {
+            (rows, modLabel) = await Task.Run(() => (scanner.ReadPrismTables(), DetectModLabel(processName)));
+        }
+        catch (Exception ex) { Log.Error("Reading the prism tables failed.", ex); }
+        finally { _tablesLoading = false; }
+
+        if (scanner != _scanner || catalog != _catalog) return;   // disconnected meanwhile
+        if (rows == null || rows.Count == 0)
+        {
+            Log.Warn($"Prism tables not readable (attempt {_tableAttempts}/{MaxTableAttempts}); using the built-in segment list.");
+            return;
+        }
+
+        _tablesRead = true;
+        // A mod adds and repoints rows but keeps the vanilla ones. If most embedded rows are missing,
+        // the read went wrong: keep the embedded catalog rather than hide working segments.
+        var liveRows = rows.Select(r => r.Row).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int known = _catalog.All.Count(d => liveRows.Contains(d.Row));
+        if (known < _catalog.All.Count * 9 / 10)
+        {
+            Log.Warn($"Prism tables read from the game contain only {known} of {_catalog.All.Count} known rows; " +
+                     "ignored, using the built-in segment list.");
+            return;
+        }
+        var result = _catalog.MergeLive(rows, modLabel);
+        Log.Info($"Prism tables read from the game: {rows.Count} row(s). {result}. Mod label: '{modLabel}'.");
+        foreach (var d in result.Added)
+            Log.Info($"  added: {d.Row} '{d.Name}' ({d.Kind}, {d.Category}) class '{d.ClassObject}'");
+        foreach (var c in result.ClassChanged) Log.Info($"  class changed: {c}");
+        foreach (var k in result.KindChanged) Log.Warn($"  kind changed: {k}");
+        foreach (var r in result.Retired) Log.Info($"  not in the game's tables: {r}");
+        if (result.Disabled.Count > 0) Log.Info($"  disabled by the mod (not offered): {string.Join(", ", result.Disabled)}");
+        foreach (var r in result.Duplicates) Log.Warn($"  row in both tables: {r}");
+
+        // Snapshots from the first scan hold stand-ins for rows that were unknown until now.
+        SegmentDef Remap(SegmentDef d) => d.Kind == SegmentKind.Unknown && _catalog.ByRow(d.Row) is { } live ? live : d;
+        foreach (var key in _session.Keys.ToList())
+        {
+            var s = _session[key];
+            _session[key] = s with
+            {
+                Segments = s.Segments.Select(x => (Remap(x.Def), x.Level)).ToArray(),
+                Feeds = s.Feeds.Select(x => (Remap(x.Def), x.Level)).ToArray(),
+            };
+        }
+
+        OnPropertyChanged(nameof(ResolvedStats));
+        OnPropertyChanged(nameof(TotalStats));
+        RebuildChoices();
+        _objectsIndexed = false;   // changed classes need their default objects looked up again
+        _forceScan = true;         // re-read segments so modded rows get their definitions
+        if (result.Added.Count > 0 || result.ClassChanged.Count > 0)
+            SetStatus($"Prism tables read from the game: {result.Added.Count} new segment(s), " +
+                      $"{result.ClassChanged.Count} changed by mods.", Tone.Good);
+    }
+
+    /// Prism mods Prismforge can name, by a word in their pak file name.
+    private static readonly (string PakPart, string Label)[] KnownPrismMods = { ("BeyondHell", "Beyond Hell") };
+
+    /// Label for segments a mod changed: the known prism mod whose pak is in the game's Paks folder
+    /// (Remnant2\Binaries\Win64\exe → Remnant2\Content\Paks, including LogicMods and ~mods), else "Mod".
+    private static string DetectModLabel(string? processName)
+    {
+        try
+        {
+            using var proc = processName == null ? null : System.Diagnostics.Process.GetProcessesByName(processName).FirstOrDefault();
+            string? exe = proc?.MainModule?.FileName;
+            if (exe == null) return "Mod";
+            string paks = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe)!, "..", "..", "Content", "Paks"));
+            if (!System.IO.Directory.Exists(paks)) return "Mod";
+            var pakNames = System.IO.Directory.EnumerateFiles(paks, "*.pak", System.IO.SearchOption.AllDirectories)
+                .Select(System.IO.Path.GetFileNameWithoutExtension).ToList();
+            foreach (var (part, label) in KnownPrismMods)
+                if (pakNames.Any(n => n!.Contains(part, StringComparison.OrdinalIgnoreCase)))
+                    return label;
+        }
+        catch (Exception ex) { Log.Debug($"Mod detection failed: {ex.Message}"); }
+        return "Mod";
     }
 
     private int _nameRetries;
@@ -660,9 +762,9 @@ public partial class MainViewModel : ObservableObject
 
         // A fusion the prism doesn't have yet (loaded classes first, so the effect starts right away).
         var present = p!.Segments.Select(s => s.Def).ToHashSet();
-        var def = _catalog.All.Where(d => d.IsResolved && d.Kind == SegmentKind.Fusion && !present.Contains(d))
+        var def = _catalog.All.Where(d => d.IsResolved && !d.IsDisabled && d.Kind == SegmentKind.Fusion && !present.Contains(d))
                       .OrderByDescending(d => d.DefaultObject != 0).FirstOrDefault()
-                  ?? _catalog.All.FirstOrDefault(d => d.IsResolved && d.Kind == SegmentKind.Standard && !present.Contains(d));
+                  ?? _catalog.All.FirstOrDefault(d => d.IsResolved && !d.IsDisabled && d.Kind == SegmentKind.Standard && !present.Contains(d));
         if (def == null)
         {
             SetStatus("No segment stat left to add.", Tone.Warn);

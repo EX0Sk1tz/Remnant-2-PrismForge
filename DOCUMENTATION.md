@@ -45,10 +45,11 @@ taskbar and the window. Replace the file and rebuild to change it. Links shown i
 | `UI/Controls.cs` | `Gem` (faceted two-tone diamond), `LevelPips`, `{ui:Caps}` letter-spacing, converters. |
 | `Models/PrismModels.cs` | `PrismData`, `SegmentSlot`, `FeedSlot`: live value, staged edit, session original. |
 | `Game/GameOffsets.cs` | Every offset and signature. |
-| `Game/SegmentCatalog.cs` + `Data/SegmentCatalog.json` | 110 rows (45 standard, 23 fusion, 42 legendary) with display name, colour, description, class. |
+| `Game/SegmentCatalog.cs` + `Data/SegmentCatalog.json` | 110 rows (45 standard, 23 fusion, 42 legendary) with display name, colour, description, class; `MergeLive` merges the game's own tables (§3a). |
+| `Game/PrismTables.cs` | Reads `PrismStoneDataTable` / `PrismStoneMythicDataTable` from memory (mod support, §3a). |
 | `Game/FNameReader.cs` | Finds the FNamePool, resolves IDs ↔ names (case-insensitive, cached). |
 | `Game/PrismScanner.cs` | Pointer chain, inventory scan, prism/segment/fed reads, stale checks, diagnostic. |
-| `Game/ObjectArray.cs` | GUObjectArray reader; finds class default objects by name. |
+| `Game/ObjectArray.cs` | GUObjectArray reader; finds class default objects and named objects (data tables). |
 | `Game/PrismWriter.cs` | Commits staged edits, then reads them back. |
 | `Game/GameBuild.cs` | Known game exes (Steam/Epic and Game Pass, both tested), store guess from path. |
 | `Game/BuildProbe.cs` | Report header, module region map, signature check; attach report when the FNamePool fails. |
@@ -76,6 +77,28 @@ A timer ticks every 2 s:
 
 After the first scan of a connection, class default objects are indexed in the background
 (also re-run on every manual Rescan).
+
+### 3a. Prism tables read from the game (mod support)
+
+After the first successful scan, Prismforge reads `PrismStoneDataTable` and
+`PrismStoneMythicDataTable` from the running game (`Game/PrismTables.cs`: DataTable RowMap, row
+field offsets from the row struct's reflection data) and merges them into the embedded catalog
+(`SegmentCatalog.MergeLive`). This is for mods such as Beyond Hell that add fusions and repoint
+legendaries:
+
+- Rows a mod adds become pickable (mythic table → Legendary; two-colour category or combo → Fusion).
+  New fusions get a description from their fragment pair ("Status Damage + Mod Damage").
+- Known rows take the game's name, description and segment class, so Apply caches the class the
+  mod uses. Rows a mod added, renamed or repointed carry a mod tag in the pickers ("Beyond Hell" when
+  its pak is in `Content\Paks`, else "Mod").
+- Rows a mod points to `PrismSegment_Invalid` stay visible on prisms that have them but are not offered.
+- Embedded rows the game's tables don't contain are hidden.
+
+On an unmodded game the tables equal the embedded catalog, so nothing changes. The embedded catalog
+stays in use when the tables can't be read (tried on up to 10 scans), when only one of the two is
+readable, or when fewer than 90% of the embedded rows are in them (a misread); the log says which.
+The catalog is reloaded fresh on every attach. The diagnostic report has a "Prism tables (live)"
+section listing every row; `NEW` marks rows not in the embedded catalog, `CLS` rows whose class differs.
 
 ---
 

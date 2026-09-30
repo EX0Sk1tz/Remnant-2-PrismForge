@@ -49,6 +49,7 @@
     <ui:XpConverter x:Key="Xp"/>
     <ui:XpConverter x:Key="Float" AllowNegative="True"/>
     <ui:EqualsConverter x:Key="Equals"/>
+    <ui:PickerMatchConverter x:Key="PickerMatch"/>
     <ui:AllEqualConverter x:Key="AllEqual"/>
 
     <!-- Title bar navigation tab; Tag=True marks the active page -->
@@ -442,6 +443,15 @@
     <!-- ═══ Stat picker: a ComboBox whose closed state is a "CHANGE" affordance ═══ -->
     <Style x:Key="PickerItem" TargetType="ComboBoxItem">
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <!-- Search: rows that don't match the picker's search text are collapsed -->
+        <Setter Property="Visibility">
+            <Setter.Value>
+                <MultiBinding Converter="{StaticResource PickerMatch}">
+                    <Binding/>
+                    <Binding Path="(ui:PickerSearch.Text)" RelativeSource="{RelativeSource AncestorType=ComboBox}"/>
+                </MultiBinding>
+            </Setter.Value>
+        </Setter>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
@@ -481,7 +491,13 @@
                         </Grid.ColumnDefinitions>
                         <ui:Gem Def="{Binding}" Width="12" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource TextBrush}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource TextBrush}"/>
+                                <!-- Segments a mod added or changed (live prism tables) -->
+                                <TextBlock Text="{Binding ModSource, Converter={StaticResource Tracked}}" FontSize="9.5" FontWeight="SemiBold"
+                                           Foreground="{StaticResource GoodBrush}" Margin="8,0,0,0" VerticalAlignment="Center"
+                                           Visibility="{Binding ModSource, Converter={StaticResource NullVis}}"/>
+                            </StackPanel>
                             <TextBlock Text="{Binding Description}" FontSize="10.5" Foreground="{StaticResource TextFaintBrush}"
                                        TextTrimming="CharacterEllipsis" MaxWidth="280"/>
                         </StackPanel>
@@ -528,9 +544,29 @@
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="24" ShadowDepth="6" Opacity="0.7" Color="Black"/>
                                 </Border.Effect>
-                                <ScrollViewer Padding="0,4">
-                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
-                                </ScrollViewer>
+                                <DockPanel>
+                                    <!-- Search by name or effect (see PickerSearch) -->
+                                    <Grid DockPanel.Dock="Top" Margin="10,10,10,4">
+                                        <TextBox x:Name="search" Style="{StaticResource Field}" FontSize="13"
+                                                 ui:PickerSearch.IsBox="True"
+                                                 Text="{Binding Path=(ui:PickerSearch.Text), RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <TextBlock Text="Search name or effect" FontSize="13" Foreground="{StaticResource TextFaintBrush}"
+                                                   Margin="9,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                                   Visibility="{Binding Text.Length, ElementName=search, Converter={StaticResource CountVisInv}}"/>
+                                    </Grid>
+                                    <TextBlock DockPanel.Dock="Top" Text="Nothing found." FontSize="12" Foreground="{StaticResource TextFaintBrush}"
+                                               Margin="12,8,12,12">
+                                        <TextBlock.Visibility>
+                                            <MultiBinding Converter="{StaticResource PickerMatch}" ConverterParameter="none">
+                                                <Binding Path="Items" RelativeSource="{RelativeSource TemplatedParent}"/>
+                                                <Binding Path="(ui:PickerSearch.Text)" RelativeSource="{RelativeSource TemplatedParent}"/>
+                                            </MultiBinding>
+                                        </TextBlock.Visibility>
+                                    </TextBlock>
+                                    <ScrollViewer Padding="0,4">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </DockPanel>
                             </Border>
                         </Popup>
                     </Grid>
@@ -549,6 +585,13 @@
         <GroupStyle.HeaderTemplate>
             <DataTemplate>
                 <Grid Margin="10,10,10,4">
+                    <!-- Hidden while a search leaves the group empty -->
+                    <Grid.Visibility>
+                        <MultiBinding Converter="{StaticResource PickerMatch}">
+                            <Binding/>
+                            <Binding Path="(ui:PickerSearch.Text)" RelativeSource="{RelativeSource AncestorType=ComboBox}"/>
+                        </MultiBinding>
+                    </Grid.Visibility>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>

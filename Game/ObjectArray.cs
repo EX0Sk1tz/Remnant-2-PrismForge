@@ -142,6 +142,40 @@ public sealed class ObjectArray
         return new Dictionary<int, ulong>(found);
     }
 
+    /// Finds objects (not class default objects) whose own FName ComparisonIndex is in
+    /// <paramref name="nameIds"/>, e.g. an asset such as a DataTable. Returns (nameId, object) pairs.
+    public List<(int NameId, ulong Object)> FindObjectsByName(IReadOnlySet<int> nameIds)
+    {
+        var found = new ConcurrentBag<(int, ulong)>();
+        if (!IsReady || nameIds.Count == 0) return new();
+        var sw = Stopwatch.StartNew();
+        ulong table = _mem.ReadPointer(_field);
+        int num = Count;
+        int chunks = (num + ChunkSize - 1) / ChunkSize;
+
+        Parallel.For(0, chunks, new ParallelOptions { MaxDegreeOfParallelism = 4 }, c =>
+        {
+            ulong chunk = _mem.ReadPointer(table + (ulong)c * 8);
+            if (chunk == 0) return;
+            int items = Math.Min(ChunkSize, num - c * ChunkSize);
+            var buf = new byte[items * _stride];
+            if (!_mem.TryReadBytes(chunk, buf, buf.Length)) return;
+            var head = new byte[0x1C];
+            for (int i = 0; i < items; i++)
+            {
+                ulong obj = BitConverter.ToUInt64(buf, i * _stride);
+                if (obj == 0 || !_mem.TryReadBytes(obj, head, head.Length)) continue;
+                int name = BitConverter.ToInt32(head, 0x18);
+                if (!nameIds.Contains(name)) continue;
+                if ((BitConverter.ToUInt32(head, 0x08) & 0x10) != 0) continue;   // skip RF_ClassDefaultObject
+                found.Add((name, obj));
+            }
+        });
+
+        Log.Info($"Object search by name: {found.Count} hit(s) for {nameIds.Count} name(s) among {num} objects in {sw.ElapsedMilliseconds} ms.");
+        return found.OrderBy(f => f.Item2).ToList();
+    }
+
     /// Finds live instances (not class default objects) whose class FName ComparisonIndex is
     /// <paramref name="classNameId"/>, e.g. every Character_Master_Player_C in the session.
     public List<ulong> FindInstances(int classNameId)

@@ -362,6 +362,11 @@ public class PrismScanner
             var chain = WalkChain(r, deep: true);
             if (chain.Ok) DumpInventory(r, chain.Inventory);
             if (chain.Pawn != 0) DumpCharacterStats(r, chain.Pawn);
+            if (chain.Ok)
+            {
+                _lastChain ??= chain;
+                DumpPrismTables(r);
+            }
         }
         catch (Exception ex)
         {
@@ -605,6 +610,37 @@ public class PrismScanner
         if (n.StartsWith("PrismOf", StringComparison.OrdinalIgnoreCase)) n = "Prism of " + n[7..];
         // "Prism of TheVoid" → "Prism of The Void"
         return System.Text.RegularExpressions.Regex.Replace(n, "(?<=[a-z])(?=[A-Z])", " ");
+    }
+
+    // ══ Live prism tables (mods) ══════════════════════════════════
+
+    /// Reads PrismStoneDataTable and PrismStoneMythicDataTable from the game. Needs one successful
+    /// scan first (GUObjectArray is validated with the chain's objects). Null when unreadable.
+    public List<LiveSegmentRow>? ReadPrismTables() => ReadPrismTables(null);
+
+    private List<LiveSegmentRow>? ReadPrismTables(Action<string>? trace)
+    {
+        if (_lastChain is not { Ok: true } c) return null;
+        _objects ??= new ObjectArray(_mem);
+        if (!_objects.IsReady && !_objects.Find(c.GEngine, c.GameInstance, c.PlayerController, c.Pawn)) return null;
+        return new PrismTableReader(_mem, _names, _objects, trace).ReadAll();
+    }
+
+    private void DumpPrismTables(DiagReport r)
+    {
+        r.Line();
+        r.Line("=== Prism tables (live) ===");
+        var rows = ReadPrismTables(s => r.Line("  " + s));
+        if (rows == null) { r.Line("  not readable."); return; }
+        foreach (var row in rows.OrderBy(x => x.Mythic).ThenBy(x => x.Row, StringComparer.OrdinalIgnoreCase))
+        {
+            var known = _catalog.ByRow(row.Row);
+            string mark = known == null || known.IsAdded ? "NEW " : !SegmentCatalog.SameClass(known.ClassObject, row.ClassObject) ? "CLS " : "    ";
+            r.Line($"  {mark}{(row.Mythic ? "Mythic" : "Main  ")} {row.Row,-32} id={row.NameId:X} cat={row.Category,-12} combo={(row.Combo ? 1 : 0)} " +
+                   $"rarity={row.Rarity} class='{row.ClassObject}' name='{row.DisplayName}'");
+            if (!string.IsNullOrEmpty(row.Description))
+                r.Line($"         {row.Description.Replace('\n', ' ')}");
+        }
     }
 
     // ══ Class default objects (segment +0x20) ═════════════════════

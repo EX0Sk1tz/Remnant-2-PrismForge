@@ -51,6 +51,9 @@ public sealed class PrismWriter
         {
             if (s.IsRowDirty && s.EditDef.IsResolved)
             {
+                // A legendary's granted ability stays until the game rebuilds the prism's effects.
+                if (_mem.ReadInt32(s.Address + GameOffsets.Seg_Action) != -1)
+                    notes.Add("A legendary with an active ability was replaced. Unequip and re-equip the prism, or reload the character, so the game drops it.");
                 // Same pairing the game keeps: +0x20 = default object of the row's class, or null.
                 ulong obj = _scanner.DefaultObjectFor(s.EditDef);
                 if (s.EditDef.HasClass && obj == 0)
@@ -201,6 +204,7 @@ public sealed class PrismWriter
         {
             var d = catalog.ByRow(row);
             if (d is not { IsResolved: true }) return Fail($"Segment '{row}' isn't known to the running game. Nothing was changed.");
+            if (d.IsDisabled) return Fail($"Segment '{d.Name}' ({row}) is switched off by a mod in this game. Nothing was changed.");
             segDefs.Add((d, level));
         }
         foreach (var (row, level) in b.Feeds)
