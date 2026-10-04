@@ -35,6 +35,10 @@ Just you, your build and a little bit of magic.
   web page, copy the code, and import it in one step.
 - **Copy code** turns any of your prisms into a code, perfect for sharing your favourite build.
 
+**Presets**
+- Save your favourite prism layouts under a name ("Mod focus", "Ranged focus", …) and put one on any
+  prism with a single click, on every character.
+
 **Mod support**
 - Prismforge reads the prism tables straight from your running game, so segments that mods add (like
   **Beyond Hell**'s new fusions and legendaries) show up in the picker with their names, descriptions
@@ -109,6 +113,19 @@ To uninstall, simply delete the exe. Settings and logs live in `%LocalAppData%\P
   fed fragments (and its pending XP, if the code has one). Full lists get more room automatically.
 - **Copy code** copies the selected prism as a build code, to share it or keep editing it on the
   planner page.
+
+**Presets**
+- Set a prism up just the way you like it, type a name under **Presets** and press **Save current**.
+  The preset keeps the prism's segments and fed fragments as they are in the game (so apply any staged
+  edits first).
+- Pick any prism, on any character, and press **Load** next to a preset. Its segments and fed
+  fragments replace the prism's right away, without asking; pending XP stays as it is. Then unequip
+  and re-equip the prism in game.
+- Loaded the wrong one? No worries: **Undo** (top right of the section) writes the previous layout back.
+- Hover a preset to rename it, delete it or copy it as a build code. **Save as preset** next to Import
+  keeps a pasted build code as a preset.
+- Presets live in `%LocalAppData%\Prismforge\presets.json`; copy that file to keep them safe or take
+  them to another PC.
 
 **Attributes tab**
 1. Search or filter the stats.

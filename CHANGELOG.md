@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.4.0
+
+- **Prism presets.** Save a prism's layout under a name ("Mod focus", "Ranged focus", …) with
+  **Save current** in the new **Presets** section on the Prisms page, and put it on any prism with one
+  click on **Load**. A preset holds the segments and fed fragments; pending XP is left alone. Load
+  writes right away without asking, and **Undo** puts the prism's previous layout back. Presets are
+  kept on this PC (`%LocalAppData%\Prismforge\presets.json`) and work on every character and save.
+- Presets can be renamed, deleted and copied as a build code. **Save as preset** next to Import keeps
+  a pasted build code (e.g. from the planner) as a preset without applying it.
+
 ## 2.3.0
 
 - **Mod support (Beyond Hell).** Prismforge now reads the prism tables from the running game. Segments

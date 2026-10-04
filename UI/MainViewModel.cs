@@ -110,6 +110,7 @@ public partial class MainViewModel : ObservableObject
         FragmentChoices = MakeView(_fragmentChoices);
         InitStatsView();
         InitShell();
+        InitPresets();
 
         Log.LineWritten += OnLogLine;
         Prisms.CollectionChanged += (_, _) => NotifyDirty();
@@ -356,6 +357,8 @@ public partial class MainViewModel : ObservableObject
             _segmentChoices.Add(d);
             if (d.Kind == SegmentKind.Standard) _fragmentChoices.Add(d);
         }
+        // Same trigger: the catalog changed, so preset tooltips may get new (mod) names.
+        RefreshPresetDetails();
     }
 
     private async Task ScanAsync()
@@ -836,12 +839,7 @@ public partial class MainViewModel : ObservableObject
     private async Task ImportBuildAsync()
     {
         var p = SelectedPrism;
-        if (!CanChangeSegmentCount(p)) return;
-        if (p!.HasRoomBackup)
-        {
-            SetStatus("Finish Make room first (pick the legendary in game) or press Restore legendary.", Tone.Warn);
-            return;
-        }
+        if (!CanEditArrays(p)) return;
         BuildSpec spec;
         try { spec = BuildCode.Decode(BuildCodeText); }
         catch (FormatException ex)
@@ -851,24 +849,31 @@ public partial class MainViewModel : ObservableObject
         }
 
         var answer = MessageBox.Show(
-            $"Build {p.Name} {p.Numeral} from this code?\n\n{BuildCode.Describe(spec, _catalog)}\n" +
+            $"Build {p!.Name} {p.Numeral} from this code?\n\n{BuildCode.Describe(spec, _catalog)}\n" +
             "This replaces all segments and fed fragments on the prism" + (spec.Xp != null ? " and its pending XP" : "") +
             ". The game saves it with the character. The old entries are written to the log.",
             "Import build code", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
         if (answer != MessageBoxResult.OK) return;
 
+        string who = spec.Note.Length > 0 ? $" ({spec.Note})" : "";
+        if (await ApplySpecAsync(p, spec, $"Build imported{who}: {spec.Segments.Count} segment(s), {spec.Feeds.Count} fed fragment(s)."))
+            BuildCodeText = "";
+    }
+
+    /// Shared end of Import and preset Load: writes the build, rescans, reports. False when it failed.
+    private async Task<bool> ApplySpecAsync(PrismData p, BuildSpec spec, string done)
+    {
         var r = _writer!.ApplyBuild(p, spec, _catalog);
         _forceScan = true;
         if (!r.Ok)
         {
             SetStatus(r.Problems[0], Tone.Bad);
-            return;
+            return false;
         }
         await TickAsync();
-        BuildCodeText = "";
-        string who = spec.Note.Length > 0 ? $" ({spec.Note})" : "";
-        SetStatus($"Build imported{who}: {spec.Segments.Count} segment(s), {spec.Feeds.Count} fed fragment(s). Unequip and re-equip the prism in game."
-                  + (r.Notes.Count > 0 ? " " + string.Join(" ", r.Notes) : ""), r.Notes.Count > 0 ? Tone.Warn : Tone.Good);
+        SetStatus(done + " Unequip and re-equip the prism in game." + (r.Notes.Count > 0 ? " " + string.Join(" ", r.Notes) : ""),
+                  r.Notes.Count > 0 ? Tone.Warn : Tone.Good);
+        return true;
     }
 
     /// Copies the selected prism's layout as a build code (can be opened in the planner or imported elsewhere).

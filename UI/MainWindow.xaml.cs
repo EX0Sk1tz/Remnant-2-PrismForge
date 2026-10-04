@@ -78,6 +78,10 @@ public partial class MainWindow : Window
         // Render the pages and overlays to PNGs (no screen capture needed).
         await Task.Delay(300);
         RenderTo("selftest_prisms.png");
+        // Presets and build code sit at the bottom of the prism panel.
+        foreach (var sv in FindChildren<ScrollViewer>(this).Where(s => s.IsVisible)) sv.ScrollToEnd();
+        await Task.Delay(300);
+        RenderTo("selftest_prisms_bottom.png");
         _vm.IsNoticeOpen = true;
         await Task.Delay(300);
         RenderTo("selftest_notice.png");
@@ -142,6 +146,26 @@ public partial class MainWindow : Window
         => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
     private void OnClose(object sender, RoutedEventArgs e) => Close();
+
+    /// The inline preset rename box takes focus when it appears.
+    private void OnRenameBoxVisible(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is TextBox tb && (bool)e.NewValue)
+            Dispatcher.BeginInvoke(() => { tb.Focus(); tb.SelectAll(); }, System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    /// Enter or leaving the box renames, Escape cancels.
+    private void OnRenameBoxKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: Models.PrismPreset preset } tb) return;
+        if (e.Key == Key.Enter) { tb.GetBindingExpression(TextBox.TextProperty)?.UpdateSource(); _vm.CommitRenamePresetCommand.Execute(preset); e.Handled = true; }
+        else if (e.Key == Key.Escape) { _vm.CancelRenamePresetCommand.Execute(preset); e.Handled = true; }
+    }
+
+    private void OnRenameBoxLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: Models.PrismPreset preset }) _vm.CommitRenamePresetCommand.Execute(preset);
+    }
 
     /// Enter commits a text field, Escape restores the staged value.
     private void OnFieldKeyDown(object sender, KeyEventArgs e)

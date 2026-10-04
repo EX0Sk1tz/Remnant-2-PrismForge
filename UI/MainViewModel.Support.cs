@@ -52,6 +52,7 @@ public partial class MainViewModel
         L($"Prisms: {Prisms.Count}, in sync: {IsInSync}, pending changes: {DirtyCount}");
         foreach (var p in Prisms)
             L($"  {p.Numeral} '{p.Name}' Lv {p.Level}, XP {p.Xp}, segments {p.Segments.Count}, fed {p.Feeds.Count}");
+        L($"Presets: {Presets.Count}");
         L($"Character stats read: {Stats.Count}, held: {HeldStats.Count}");
         L($"Stat hook: {HookState} ({HookDetail}), hits {HookHits}");
         return sb.ToString();

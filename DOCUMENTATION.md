@@ -57,6 +57,7 @@ taskbar and the window. Replace the file and rebuild to change it. Links shown i
 | `Memory/*` | Win32 P/Invoke, read/write helpers, AOB scan. |
 | `Diagnostics/Log.cs` | Session log (Info level, `--verbose` for Debug), newest 10 kept, plus the live journal feed. |
 | `Diagnostics/AppInfo.cs` | Version, credits, links, settings file; data folder `%LocalAppData%\Prismforge`. |
+| `Diagnostics/PresetStore.cs` + `UI/MainViewModel.Presets.cs` | Prism presets: named build codes in `presets.json` (§5, Presets). |
 | `UI/MainViewModel.Shell.cs` | About panel and first-start safety notice (shown once per version). |
 | `Game/StatAdvice.cs` | Soft warning rules for attribute targets. |
 | `Game/StatInfo.cs` | Tooltip text for every attribute; "(likely)" marks explanations inferred from the name. |
@@ -271,6 +272,26 @@ write all entries, Num = count, read back. Segment entries are built like Add se
 action -1, class default object or null). CurrentFeedData is a TArray like CurrentSegments: Data
 `+0x70`, Num `+0x78`, Max `+0x7C`, stride 0x0C; it is grown the same way. Pending XP is written only
 if the code has `xp`. The internal level (`+0x28`) is left alone. Untested in game so far.
+
+### Presets (2.4.0)
+
+Named build codes kept in `%LocalAppData%\Prismforge\presets.json`
+(`Diagnostics/PresetStore.cs`, `UI/MainViewModel.Presets.cs`):
+`{ "Version":1, "Presets":[{ "Name", "Code", "SavedFrom", "Created" }] }`. `Code` is a normal `PF1-`
+code whose note is the preset name and which never has `xp`. A code with XP (pasted, or edited by
+hand) has it stripped on save and again on load, so presets never touch pending XP.
+
+- **Load** is `ApplyBuild` on the selected prism, with no confirmation (Import still asks). The same
+  checks as the array edits apply first (linked, no staged edits, no pending Make room).
+- Before writing, the prism's live layout is kept in memory; **Undo** applies it back to the prism
+  with that data address. It holds one step and is offered even when the load failed partway.
+- **Save current** stores the live values (`PrismWriter.ToSpec`), not staged edits; the status
+  says so when the prism has staged edits. Same name (case-insensitive) replaces after asking.
+- Rows are stored by name and not checked on save, so a preset with mod rows can be kept on an
+  unmodded game; loading it there fails with "isn't known to the running game. Nothing was changed."
+- The file is written to `presets.json.tmp` and moved over. An unreadable file is renamed to
+  `presets.bad_<time>.json` and the list starts empty; it is never overwritten. The support zip
+  includes `presets.json`.
 
 ### Remove, reorder, reset (tested on Steam, 2026-09-28)
 

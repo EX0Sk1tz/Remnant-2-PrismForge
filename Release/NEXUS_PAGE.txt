@@ -14,6 +14,11 @@ Edit your [b]prisms[/b] and [b]character attributes[/b] while Remnant II is runn
 
 [b][color=#e07b3c]Tested on the Steam and Game Pass versions.[/color][/b]
 
+[size=4][b]New in 2.4.0[/b][/size]
+[list]
+[*][b]Prism presets[/b]: save prism layouts under a name ("Mod focus", "Ranged focus") and load one into any prism with one click, on every character. Undo puts the old layout back
+[/list]
+
 [size=4][b]New in 2.1.0[/b][/size]
 [list]
 [*][b]Add segment any time[/b]: a full prism gets more room from the game's own memory allocator, no workaround needed
@@ -34,6 +39,7 @@ Edit your [b]prisms[/b] and [b]character attributes[/b] while Remnant II is runn
 [*][b]Change any segment[/b]: 45 standard stats, 23 fusions, 42 legendaries, with in-game names and descriptions
 [*][b]Change segment levels and pending XP[/b]; fusion bonuses scale with level
 [*][b]Extra segments[/b] beyond the usual six, remove and reorder segments, reset a prism (experimental)
+[*][b]Presets and build codes[/b]: save layouts and switch a prism between them in one click, share them as codes
 [*]Edits are staged and only written on [b]Apply[/b]; every write is read back and confirmed
 [*][b]Discard[/b] and [b]Revert to session start[/b] to undo
 [*][b]Attributes[/b]: live list of ~220 character stats (damage, crit, weak spot, speeds, resistances, caps)

@@ -27,6 +27,7 @@ public static class SupportBundle
             foreach (var f in logs)
                 if (Add(zip, f.FullName, f.Name)) files++;
             if (Add(zip, Path.Combine(AppInfo.DataDirectory, "settings.json"), "settings.json")) files++;
+            if (Add(zip, PresetStore.FilePath, PresetStore.FileName)) files++;
         }
         Log.Info($"Support zip written: {Path.GetFileName(path)} ({files} file(s) plus summary).");
         return path;

@@ -648,6 +648,106 @@
                                 </ItemsControl>
                             </StackPanel>
 
+                            <!-- ─── Presets (saved layouts, load into any prism) ─── -->
+                            <StackPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                                <Grid Margin="0,44,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{ui:Caps 'Presets', Wide=True}" Style="{StaticResource SectionLabel}"/>
+                                    <Rectangle Grid.Column="1" Height="1" Fill="{StaticResource HairlineBrush}" Margin="16,0" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="2" Style="{StaticResource BaseButton}" Padding="12,0" Height="26"
+                                            Command="{Binding UndoPresetLoadCommand}"
+                                            Visibility="{Binding CanUndoPresetLoad, Converter={StaticResource BoolVis}}"
+                                            ToolTip="Write back the segments and fed fragments the prism had before the last preset was loaded">
+                                        <TextBlock Text="{Binding UndoPresetText, Converter={StaticResource Tracked}}" FontSize="10.5"/>
+                                    </Button>
+                                </Grid>
+                                <TextBlock FontSize="12" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,14" TextWrapping="Wrap"
+                                           Text="Saved prism layouts (segments and fed fragments, no XP), kept on this PC for every character. Load replaces this prism's segments and fed fragments right away; Undo puts the old ones back."/>
+
+                                <ItemsControl ItemsSource="{Binding Presets}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type m:PrismPreset}">
+                                            <Border x:Name="card" Height="48" Margin="0,0,0,6" Background="#A0212325"
+                                                    BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Margin="14,0" VerticalAlignment="Center" Background="Transparent" ToolTip="{Binding Details}">
+                                                        <TextBlock x:Name="name" Text="{Binding Name}" FontSize="13.5" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBox x:Name="renameBox" Style="{StaticResource Field}" FontSize="13" Padding="4,0" Visibility="Collapsed"
+                                                                 MaxLength="60"
+                                                                 Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                                                                 IsVisibleChanged="OnRenameBoxVisible" KeyDown="OnRenameBoxKeyDown" LostKeyboardFocus="OnRenameBoxLostFocus"/>
+                                                        <TextBlock Text="{Binding Summary}" FontSize="11.5" Foreground="{StaticResource TextFaintBrush}"/>
+                                                    </StackPanel>
+                                                    <StackPanel x:Name="tools" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Hidden">
+                                                        <Button Style="{StaticResource LinkButton}" ToolTip="Rename this preset"
+                                                                Command="{Binding DataContext.BeginRenamePresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}">
+                                                            <TextBlock Text="{ui:Caps Rename}"/>
+                                                        </Button>
+                                                        <Button Style="{StaticResource LinkButton}" ToolTip="Copy this preset as a build code (to share it or open it in the planner)"
+                                                                Command="{Binding DataContext.CopyPresetCodeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}">
+                                                            <TextBlock Text="{ui:Caps 'Copy code'}"/>
+                                                        </Button>
+                                                        <Button Style="{StaticResource LinkButton}" Padding="4" Margin="0,0,6,0" ToolTip="Delete this preset (asks first)"
+                                                                Command="{Binding DataContext.DeletePresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}">
+                                                            <Path Data="M0,2 H10 M3,2 V0.5 H7 V2 M1.5,2 L2.3,11 H7.7 L8.5,2 M4,4.5 V8.5 M6,4.5 V8.5"
+                                                                  Stroke="{StaticResource BadBrush}" StrokeThickness="1.1"/>
+                                                        </Button>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" MinWidth="90" Height="30" Padding="14,0"
+                                                            Command="{Binding DataContext.LoadPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip="Replace the selected prism's segments and fed fragments with this preset's (XP stays). Written to the game right away.">
+                                                        <TextBlock Text="{ui:Caps Load}" FontSize="11"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsRenaming}" Value="True">
+                                                    <Setter TargetName="name" Property="Visibility" Value="Collapsed"/>
+                                                    <Setter TargetName="renameBox" Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <Trigger SourceName="card" Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="card" Property="BorderBrush" Value="{StaticResource BronzeBrush}"/>
+                                                    <Setter TargetName="tools" Property="Visibility" Value="Visible"/>
+                                                </Trigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock FontSize="12.5" Foreground="{StaticResource TextDimBrush}" Margin="0,0,0,6" TextWrapping="Wrap"
+                                           Visibility="{Binding Presets.Count, Converter={StaticResource CountVisInv}}"
+                                           Text="No presets yet. Set a prism up the way you like it, type a name below and press Save current."/>
+
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{ui:Caps 'Name'}" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox Grid.Column="1" Style="{StaticResource Field}" Height="32" MaxLength="60"
+                                             Text="{Binding PresetName, UpdateSourceTrigger=PropertyChanged}"
+                                             ToolTip="Name for the new preset, e.g. Mod focus. Empty uses the prism's name. Same name as an existing preset replaces it (asks first)."/>
+                                    <Button Grid.Column="2" Style="{StaticResource BaseButton}" Margin="10,0,0,0" MinWidth="120" Height="32" Padding="16,0"
+                                            Command="{Binding SavePresetCommand}"
+                                            ToolTip="Save the selected prism's segments and fed fragments, as they are in the game, under this name">
+                                        <TextBlock Text="{ui:Caps 'Save current'}" FontSize="11"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+
                             <!-- ─── Build code (planner page / sharing) ─── -->
                             <Grid Margin="0,44,0,6">
                                 <Grid.ColumnDefinitions>
@@ -675,10 +775,16 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBox Style="{StaticResource Field}" Height="32" FontFamily="{StaticResource MonoFont}" FontSize="12"
                                          Text="{Binding BuildCodeText, UpdateSourceTrigger=PropertyChanged}"/>
-                                <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Margin="10,0,0,0" MinWidth="120" Height="32" Padding="16,0"
+                                <Button Grid.Column="1" Style="{StaticResource BaseButton}" Margin="10,0,0,0" Height="32" Padding="16,0"
+                                        Command="{Binding SaveCodeAsPresetCommand}"
+                                        ToolTip="Keep this code as a preset without applying it. Uses the name under Presets, else the code's note.">
+                                    <TextBlock Text="{ui:Caps 'Save as preset'}" FontSize="11"/>
+                                </Button>
+                                <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Margin="10,0,0,0" MinWidth="120" Height="32" Padding="16,0"
                                         Command="{Binding ImportBuildCommand}">
                                     <TextBlock Text="{ui:Caps Import}" FontSize="11"/>
                                 </Button>

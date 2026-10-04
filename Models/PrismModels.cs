@@ -275,3 +275,21 @@ public sealed partial class StatEntry : ObservableObject
 public sealed partial class FeedSlot : SlotBase
 {
 }
+
+/// <summary>A saved prism layout (build code without XP) that can be loaded into any prism.</summary>
+public sealed partial class PrismPreset : ObservableObject
+{
+    [ObservableProperty] private string _name = "";
+    public string Code { get; set; } = "";
+    public string SavedFrom { get; set; } = "";
+    public DateTime Created { get; set; }
+
+    /// "6 segments · Lv 60 · 2 fed", from the code.
+    [ObservableProperty] private string _summary = "";
+
+    /// Segment names for the tooltip; rebuilt when the catalog changes (mods rename rows).
+    [ObservableProperty] private string _details = "";
+
+    [ObservableProperty] private bool _isRenaming;
+    [ObservableProperty] private string _editName = "";
+}
